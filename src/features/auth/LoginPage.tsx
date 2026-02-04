@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from './AuthContext'
 import { Button, Input, Card } from '../../shared/components'
 
 export function LoginPage() {
-    const { signInWithGoogle, signInWithEmail, signUpWithEmail } = useAuth()
+    const { signInWithGoogle, signInWithEmail, signUpWithEmail, user } = useAuth()
     const navigate = useNavigate()
     const [isSignUp, setIsSignUp] = useState(false)
     const [email, setEmail] = useState('')
@@ -12,6 +12,13 @@ export function LoginPage() {
     const [displayName, setDisplayName] = useState('')
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
+
+    // Redirect if already logged in (e.g. from autologin)
+    useEffect(() => {
+        if (user) {
+            navigate('/')
+        }
+    }, [user, navigate])
 
     async function handleGoogleSignIn() {
         setError('')
