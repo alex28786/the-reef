@@ -300,3 +300,46 @@ npm run lint         # ESLint check
 npx supabase start   # Local Supabase (requires Docker)
 npx supabase db push # Push migrations to cloud
 ```
+
+---
+
+## MCP_SUPABASE
+
+LLM agents can use Supabase MCP server for direct database operations:
+
+```yaml
+# Available MCP tools:
+mcp_supabase-mcp-server_list_projects    # List all projects
+mcp_supabase-mcp-server_list_tables      # Get schema info
+mcp_supabase-mcp-server_execute_sql      # Run any SQL query
+
+# Example: Query profiles
+project_id: sisrlbxaijnfrrvfjhli
+query: "SELECT * FROM profiles"
+
+# Example: Insert data
+query: "INSERT INTO profiles (id, display_name, reef_id) VALUES (...)"
+```
+
+**Project Reference**: `sisrlbxaijnfrrvfjhli`
+
+---
+
+## TESTING
+
+### Autologin Feature
+
+Use URL parameter for quick login during testing:
+
+```
+http://localhost:5173?autologin=email/password
+http://localhost:5173/retro?autologin=alex28786@gmail.com/Doffel&6128
+http://localhost:5173/retro?autologin=tiff@tiff.de/tifftiff
+```
+
+**Test Users**:
+| Email | Password | Role |
+|-------|----------|------|
+| alex28786@gmail.com | Doffel&6128 | husband |
+| tiff@tiff.de | tifftiff | wife |
+

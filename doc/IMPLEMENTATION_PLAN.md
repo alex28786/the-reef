@@ -1,12 +1,14 @@
 # The Reef - Roadmap
 
-## Current Status: MVP Complete ✅
+## Current Status: MVP Complete ✅ + Testing Infrastructure ✅
 
 Core features implemented:
 - Authentication (Supabase Auth)
 - The Bridge (Seal NVC transformation with Claude AI)
 - The Retro (Octi retrospective with blind submission)
 - Deployed on Netlify
+- **NEW**: Unit testing with Vitest (29 tests passing)
+- **NEW**: Autologin feature for testing
 
 ---
 
@@ -18,6 +20,7 @@ Core features implemented:
 - [ ] Add error monitoring (Sentry)
 
 ### P1 - High
+- [ ] E2E tests with Playwright
 - [ ] Message history view (sent/received)
 - [ ] Push notifications (partner submitted, retro ready)
 - [ ] Reef creation wizard for new couples
@@ -36,10 +39,10 @@ Core features implemented:
 
 ## Technical Debt
 
-- [ ] Add unit tests (Vitest)
+- [x] Add unit tests (Vitest) ✅ 29 tests
 - [ ] Add E2E tests (Playwright)
 - [ ] Regenerate Supabase types after schema changes
-- [ ] Clean up console.log debug statements
+- [x] Clean up console.log debug statements (partial)
 
 ---
 
@@ -48,3 +51,5 @@ Core features implemented:
 **Raw Fetch API**: Using `supabaseApi.ts` instead of Supabase client due to AbortError issues with network proxies.
 
 **Edge Functions**: Deployed with `--no-verify-jwt` for simplicity. Add request validation if scaling.
+
+**MCP Supabase**: Use `mcp_supabase-mcp-server_execute_sql` for direct database operations.

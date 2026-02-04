@@ -31,6 +31,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [session, setSession] = useState<Session | null>(null)
     const [loading, setLoading] = useState(true)
 
+    // Auto-login via URL parameter: ?autologin=email/password
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search)
+        const autologin = params.get('autologin')
+
+        if (autologin) {
+            const [email, password] = autologin.split('/')
+            if (email && password) {
+                console.log('[Auth] Auto-login detected for:', email)
+                // Remove the autologin param from URL to prevent re-triggering
+                const newUrl = window.location.pathname +
+                    (params.toString() ? '?' + (() => { params.delete('autologin'); return params.toString() })() : '')
+                window.history.replaceState({}, '', newUrl || window.location.pathname)
+
+                // Trigger auto-login
+                supabase.auth.signInWithPassword({ email, password })
+                    .then(({ error }) => {
+                        if (error) {
+                            console.error('[Auth] Auto-login failed:', error.message)
+                        } else {
+                            console.log('[Auth] Auto-login successful!')
+                        }
+                    })
+            }
+        }
+    }, [])
+
     useEffect(() => {
         // Get initial session with error handling
         console.log('[Auth] Starting initial session check...')
