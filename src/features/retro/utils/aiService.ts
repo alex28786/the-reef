@@ -24,8 +24,8 @@ export async function analyzeNarrative(narrative: string): Promise<RetroAIAnalys
             .eq('key', RETRO_PROMPTS.CLERK_ANALYSIS)
             .single()
 
-        if (data) {
-            prompt = data.prompt_text
+        if (data && 'prompt_text' in data) {
+            prompt = (data as { prompt_text: string }).prompt_text
         }
     } catch {
         // Use default

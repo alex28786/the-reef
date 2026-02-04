@@ -154,10 +154,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
 
         if (!error && data.user) {
-            // Create profile for new user
-            await supabase.from('profiles').insert({
-                id: data.user.id,
-                display_name: displayName,
+            // Create profile for new user using raw fetch to bypass type issues
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+            const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+            await fetch(`${supabaseUrl}/rest/v1/profiles`, {
+                method: 'POST',
+                headers: {
+                    'apikey': supabaseAnonKey,
+                    'Authorization': `Bearer ${supabaseAnonKey}`,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'return=minimal',
+                },
+                body: JSON.stringify({
+                    id: data.user.id,
+                    display_name: displayName,
+                }),
             })
         }
 

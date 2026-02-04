@@ -3,7 +3,7 @@ import { ArrowLeft, Send, Loader2, CheckCircle } from 'lucide-react'
 import type { Emotion } from '../types'
 import { EMOTIONS } from '../types'
 import { Button, Card } from '../../../shared/components'
-import { supabase } from '../../../shared/lib/supabase'
+import { fetchSingleRow, insertRow } from '../../../shared/lib/supabaseApi'
 import { useAuth } from '../../auth'
 
 interface MessageDeliveryProps {
@@ -19,7 +19,7 @@ export function MessageDelivery({
     onSent,
     onBack,
 }: MessageDeliveryProps) {
-    const { profile } = useAuth()
+    const { profile, accessToken } = useAuth()
     const [loading, setLoading] = useState(false)
     const [sent, setSent] = useState(false)
     const [error, setError] = useState('')
@@ -27,7 +27,7 @@ export function MessageDelivery({
     const selectedEmotion = EMOTIONS.find((e) => e.value === emotion)
 
     async function handleSend() {
-        if (!profile?.reef_id) {
+        if (!profile?.reef_id || !accessToken) {
             setError('You must be linked to a reef to send messages')
             return
         }
@@ -37,21 +37,21 @@ export function MessageDelivery({
 
         try {
             // Get partner's profile
-            const { data: partnerData, error: partnerError } = await supabase
-                .from('profiles')
-                .select('id')
-                .eq('reef_id', profile.reef_id)
-                .neq('id', profile.id)
-                .single()
+            const { data: partnerData, error: partnerError } = await fetchSingleRow<{ id: string }>(
+                'profiles',
+                accessToken,
+                `&reef_id=eq.${profile.reef_id}&id=neq.${profile.id}`
+            )
 
             if (partnerError || !partnerData) {
                 throw new Error('Could not find your partner')
             }
 
             // Insert bridge message
-            const { error: insertError } = await supabase
-                .from('bridge_messages')
-                .insert({
+            const { error: insertError } = await insertRow(
+                'bridge_messages',
+                accessToken,
+                {
                     reef_id: profile.reef_id,
                     sender_id: profile.id,
                     recipient_id: partnerData.id,
@@ -59,7 +59,8 @@ export function MessageDelivery({
                     original_text: transformedText, // In production, store both original and transformed
                     transformed_text: transformedText,
                     ai_analysis: {},
-                })
+                }
+            )
 
             if (insertError) throw insertError
 

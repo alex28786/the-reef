@@ -2,14 +2,14 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Eye, Video, Brain, AlertTriangle, FileText } from 'lucide-react'
 import { Button, Card, Textarea } from '../../../shared/components'
-import { supabase } from '../../../shared/lib/supabase'
+import { fetchSingleRow, fetchRows, updateRow } from '../../../shared/lib/supabaseApi'
 import { useAuth } from '../../auth'
 import type { Retro, RetroSubmission, RetroAIAnalysis } from '../types'
 import { analyzeNarrative, generateMockAnalysis } from '../utils/aiService'
 
 export function RevealView() {
     const { retroId } = useParams<{ retroId: string }>()
-    const { profile } = useAuth()
+    const { profile, accessToken } = useAuth()
     const navigate = useNavigate()
     const [retro, setRetro] = useState<Retro | null>(null)
     const [submissions, setSubmissions] = useState<RetroSubmission[]>([])
@@ -21,28 +21,30 @@ export function RevealView() {
     const [savingScript, setSavingScript] = useState(false)
 
     useEffect(() => {
-        if (retroId && profile?.id) {
+        if (retroId && profile?.id && accessToken) {
             fetchData()
         }
-    }, [retroId, profile?.id])
+    }, [retroId, profile?.id, accessToken])
 
     async function fetchData() {
+        if (!accessToken || !retroId || !profile?.id) return
         setLoading(true)
 
-        const { data: retroData } = await supabase
-            .from('retros')
-            .select('*')
-            .eq('id', retroId)
-            .single()
+        const { data: retroData } = await fetchSingleRow<Retro>(
+            'retros',
+            accessToken,
+            `&id=eq.${retroId}`
+        )
 
         if (retroData) {
             setRetro(retroData)
         }
 
-        const { data: submissionsData } = await supabase
-            .from('retro_submissions')
-            .select('*')
-            .eq('retro_id', retroId)
+        const { data: submissionsData } = await fetchRows<RetroSubmission>(
+            'retro_submissions',
+            accessToken,
+            `&retro_id=eq.${retroId}`
+        )
 
         if (submissionsData) {
             setSubmissions(submissionsData)
@@ -64,6 +66,7 @@ export function RevealView() {
     }
 
     async function analyzeSubmissions(subs: RetroSubmission[]) {
+        if (!accessToken || !retroId) return
         setAnalyzing(true)
 
         try {
@@ -71,17 +74,21 @@ export function RevealView() {
             for (const sub of subs) {
                 const analysis = await generateMockAnalysis(sub.raw_narrative)
 
-                await supabase
-                    .from('retro_submissions')
-                    .update({ ai_analysis: analysis })
-                    .eq('id', sub.id)
+                await updateRow(
+                    'retro_submissions',
+                    accessToken,
+                    `id=eq.${sub.id}`,
+                    { ai_analysis: analysis }
+                )
             }
 
             // Update retro status to revealed
-            await supabase
-                .from('retros')
-                .update({ status: 'revealed' })
-                .eq('id', retroId)
+            await updateRow(
+                'retros',
+                accessToken,
+                `id=eq.${retroId}`,
+                { status: 'revealed' }
+            )
 
             await fetchData()
         } catch (err) {
@@ -92,15 +99,17 @@ export function RevealView() {
     }
 
     async function handleSaveScript() {
-        if (!mySubmission || !futureScript.trim()) return
+        if (!mySubmission || !futureScript.trim() || !accessToken) return
 
         setSavingScript(true)
 
         try {
-            await supabase
-                .from('retro_submissions')
-                .update({ future_script: futureScript.trim() })
-                .eq('id', mySubmission.id)
+            await updateRow(
+                'retro_submissions',
+                accessToken,
+                `id=eq.${mySubmission.id}`,
+                { future_script: futureScript.trim() }
+            )
         } catch (err) {
             console.error(err)
         } finally {

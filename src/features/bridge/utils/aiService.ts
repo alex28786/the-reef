@@ -45,7 +45,10 @@ async function getSystemPrompt(key: string, defaultPrompt: string): Promise<stri
             console.log(`Using default prompt for ${key}`)
             return defaultPrompt
         }
-        return data.prompt_text
+        if ('prompt_text' in data) {
+            return (data as { prompt_text: string }).prompt_text
+        }
+        return defaultPrompt
     } catch {
         return defaultPrompt
     }
