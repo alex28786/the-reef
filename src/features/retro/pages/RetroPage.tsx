@@ -25,6 +25,7 @@ function RetroList() {
     const navigate = useNavigate()
     const [retros, setRetros] = useState<Retro[]>([])
     const [loading, setLoading] = useState(true)
+    const [error, setError] = useState('')
 
     useEffect(() => {
         if (profile?.reef_id && accessToken) {
@@ -35,27 +36,31 @@ function RetroList() {
     async function fetchRetrosData() {
         if (!profile?.reef_id || !accessToken) return
 
-        const { data, error } = await fetchRows<Retro>(
+        const { data, error: fetchError } = await fetchRows<Retro>(
             'retros',
             accessToken,
             `&reef_id=eq.${profile.reef_id}&order=created_at.desc`
         )
 
-        if (error) {
-            console.error('Error fetching retros:', error)
+        if (fetchError) {
+            console.error('Error fetching retros:', fetchError)
+            setError('Failed to load retrospectives.')
         } else {
             setRetros(data || [])
         }
         setLoading(false)
     }
 
-    function getStatusBadge(status: string) {
-        const styles = {
-            pending: 'bg-yellow-500/20 text-yellow-300',
-            submitted: 'bg-blue-500/20 text-blue-300',
-            revealed: 'bg-green-500/20 text-green-300',
-        }
-        return styles[status as keyof typeof styles] || styles.pending
+    function getStatusBadge(status: string, count: number) {
+        if (status === 'revealed') return 'bg-green-500/20 text-green-300'
+        if (count === 1) return 'bg-blue-500/20 text-blue-300'
+        return 'bg-yellow-500/20 text-yellow-300'
+    }
+
+    function getStatusText(status: string, count: number) {
+        if (status === 'revealed') return 'revealed'
+        if (count === 1) return 'submitted (1/2)'
+        return 'pending (0/2)'
     }
 
     function handleRetroClick(retro: Retro) {
@@ -90,40 +95,50 @@ function RetroList() {
                         <div className="text-3xl animate-bounce">🐙</div>
                         <p className="text-[var(--color-text-muted)] mt-2">Loading...</p>
                     </div>
-                ) : retros.length === 0 ? (
-                    <Card className="text-center py-8">
-                        <p className="text-[var(--color-text-muted)]">
-                            No retrospectives yet. Start one to work through a past event together.
-                        </p>
-                    </Card>
                 ) : (
-                    <div className="space-y-3">
-                        {retros.map((retro) => (
-                            <button
-                                key={retro.id}
-                                onClick={() => handleRetroClick(retro)}
-                                className="w-full text-left"
-                            >
-                                <Card className="hover:border-[var(--color-seafoam)] transition-colors">
-                                    <div className="flex items-start justify-between">
-                                        <div>
-                                            <h3 className="font-medium text-[var(--color-text)]">
-                                                {retro.title}
-                                            </h3>
-                                            {retro.event_date && (
-                                                <p className="text-sm text-[var(--color-text-muted)] mt-1">
-                                                    Event: {new Date(retro.event_date).toLocaleDateString()}
-                                                </p>
-                                            )}
-                                        </div>
-                                        <span className={`px-2 py-1 rounded-full text-xs ${getStatusBadge(retro.status)}`}>
-                                            {retro.status}
-                                        </span>
-                                    </div>
-                                </Card>
-                            </button>
-                        ))}
-                    </div>
+                    <>
+                        {error && (
+                            <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-3 mb-6">
+                                <p className="text-red-400 text-sm text-center">{error}</p>
+                            </div>
+                        )}
+
+                        {retros.length === 0 ? (
+                            <Card className="text-center py-8">
+                                <p className="text-[var(--color-text-muted)]">
+                                    No retrospectives yet. Start one to work through a past event together.
+                                </p>
+                            </Card>
+                        ) : (
+                            <div className="space-y-3">
+                                {retros.map((retro) => (
+                                    <button
+                                        key={retro.id}
+                                        onClick={() => handleRetroClick(retro)}
+                                        className="w-full text-left"
+                                    >
+                                        <Card className="hover:border-[var(--color-seafoam)] transition-colors">
+                                            <div className="flex items-start justify-between">
+                                                <div>
+                                                    <h3 className="font-medium text-[var(--color-text)]">
+                                                        {retro.title}
+                                                    </h3>
+                                                    {retro.event_date && (
+                                                        <p className="text-sm text-[var(--color-text-muted)] mt-1">
+                                                            Event: {new Date(retro.event_date).toLocaleDateString()}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${getStatusBadge(retro.status, retro.submissions_count)}`}>
+                                                    {getStatusText(retro.status, retro.submissions_count)}
+                                                </span>
+                                            </div>
+                                        </Card>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
         </div>

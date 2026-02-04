@@ -16,6 +16,7 @@ export interface Retro {
     title: string
     event_date?: Date
     status: RetroStatus
+    submissions_count: number
     ai_summary: Record<string, unknown>
     created_at: Date
 }

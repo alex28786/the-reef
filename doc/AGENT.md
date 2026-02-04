@@ -297,6 +297,8 @@ retro_ai_enabled: false   # Currently using mock for Retro analysis
 npm run dev          # Start dev server (localhost:5173)
 npm run build        # Production build to dist/
 npm run lint         # ESLint check
+npm run test         # Run unit tests (Vitest)
+npx playwright test  # Run E2E tests (Playwright)
 npx supabase start   # Local Supabase (requires Docker)
 npx supabase db push # Push migrations to cloud
 ```

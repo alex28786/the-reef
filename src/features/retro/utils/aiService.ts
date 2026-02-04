@@ -14,42 +14,31 @@ Be gentle but honest. The goal is understanding, not blame.
 NARRATIVE:
 `
 
-export async function analyzeNarrative(narrative: string): Promise<RetroAIAnalysis> {
-    // Fetch prompt from database
-    let prompt = DEFAULT_CLERK_PROMPT
-    try {
-        const { data } = await supabase
-            .from('system_prompts')
-            .select('prompt_text')
-            .eq('key', RETRO_PROMPTS.CLERK_ANALYSIS)
-            .single()
+// Response type from Edge Function
+export interface RetroStatusResponse {
+    status: 'waiting' | 'revealed' | 'error'
+    message?: string
+}
 
-        if (data && 'prompt_text' in data) {
-            prompt = (data as { prompt_text: string }).prompt_text
-        }
-    } catch {
-        // Use default
-    }
-
-    // Call Edge Function
+export async function checkRetroStatus(retroId: string, accessToken?: string): Promise<RetroStatusResponse> {
     try {
         const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/retro-clerk`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+                'Authorization': `Bearer ${accessToken || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
             },
-            body: JSON.stringify({ narrative, prompt }),
+            body: JSON.stringify({ retro_id: retroId }),
         })
 
         if (response.ok) {
             return await response.json()
         }
-    } catch {
-        console.warn('Edge function unavailable, using mock')
+        return { status: 'error', message: 'Function error' }
+    } catch (e) {
+        console.warn('Edge function unavailable', e)
+        return { status: 'error', message: 'Network error' }
     }
-
-    return generateMockAnalysis(narrative)
 }
 
 export async function generateMockAnalysis(narrative: string): Promise<RetroAIAnalysis> {

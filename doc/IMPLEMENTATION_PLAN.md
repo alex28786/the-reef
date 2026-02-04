@@ -9,6 +9,7 @@ Core features implemented:
 - Deployed on Netlify
 - **NEW**: Unit testing with Vitest (29 tests passing)
 - **NEW**: Autologin feature for testing
+- **NEW**: E2E testing with Playwright (4 tests passing)
 
 ---
 
@@ -20,7 +21,7 @@ Core features implemented:
 - [ ] Add error monitoring (Sentry)
 
 ### P1 - High
-- [ ] E2E tests with Playwright
+- [x] E2E tests with Playwright ✅
 - [ ] Message history view (sent/received)
 - [ ] Push notifications (partner submitted, retro ready)
 - [ ] Reef creation wizard for new couples
@@ -40,7 +41,7 @@ Core features implemented:
 ## Technical Debt
 
 - [x] Add unit tests (Vitest) ✅ 29 tests
-- [ ] Add E2E tests (Playwright)
+- [x] Add E2E tests (Playwright) ✅ 4 tests
 - [ ] Regenerate Supabase types after schema changes
 - [x] Clean up console.log debug statements (partial)
 

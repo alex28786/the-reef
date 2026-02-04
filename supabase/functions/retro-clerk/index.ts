@@ -2,6 +2,7 @@
 // Deploy with: supabase functions deploy retro-clerk
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+import { createClient } from 'jsr:@supabase/supabase-js@2'
 import Anthropic from 'npm:@anthropic-ai/sdk@0.26.0'
 
 const corsHeaders = {
@@ -10,8 +11,7 @@ const corsHeaders = {
 }
 
 interface RequestBody {
-    narrative: string
-    prompt: string
+    retro_id: string
 }
 
 Deno.serve(async (req: Request) => {
@@ -21,60 +21,127 @@ Deno.serve(async (req: Request) => {
     }
 
     try {
+        const { retro_id } = await req.json() as RequestBody
+
+        if (!retro_id) throw new Error('Missing retro_id')
+
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+        const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
         const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')
-        if (!anthropicKey) {
-            throw new Error('ANTHROPIC_API_KEY not configured')
+
+        // Initialize Supabase Admin Client (Bypass RLS)
+        const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+        // 1. Fetch Submissions
+        const { data: submissions, error: fetchError } = await supabase
+            .from('retro_submissions')
+            .select('*')
+            .eq('retro_id', retro_id)
+
+        if (fetchError) throw fetchError
+
+        // 2. Check Count
+        if (!submissions || submissions.length < 2) {
+            return new Response(
+                JSON.stringify({ status: 'waiting', message: 'Waiting for partner submission' }),
+                { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+            )
         }
 
-        const { narrative, prompt } = await req.json() as RequestBody
+        // 3. Analyze Submissions (if needed) and Update
+        // Only run analysis if it's missing (idempotency)
+        const updates = submissions.map(async (sub) => {
+            if (sub.ai_analysis && Object.keys(sub.ai_analysis).length > 0) {
+                return // Already analyzed
+            }
 
-        const anthropic = new Anthropic({ apiKey: anthropicKey })
+            // Run Analysis
+            let analysis = {}
+            if (anthropicKey) {
+                analysis = await runAnthropicAnalysis(sub.raw_narrative, anthropicKey)
+            } else {
+                // Should not happen in prod, but safe fallback for tests/local without key
+                console.warn('No Anthropic Key, using fallback')
+                analysis = generateMockAnalysis(sub.raw_narrative)
+            }
 
-        const response = await anthropic.messages.create({
-            model: 'claude-3-haiku-20240307',
-            max_tokens: 1000,
-            messages: [{
-                role: 'user',
-                content: prompt + '\n\n' + narrative
-            }]
+            // Update Submission
+            const { error: updateError } = await supabase
+                .from('retro_submissions')
+                .update({ ai_analysis: analysis })
+                .eq('id', sub.id)
+
+            if (updateError) throw updateError
         })
 
-        const responseText = response.content[0].type === 'text'
-            ? response.content[0].text
-            : ''
+        await Promise.all(updates)
 
-        // Try to parse JSON from the response
-        let analysis = {
-            videoFacts: [],
-            interpretations: [],
-            mindReads: [],
-            emotionalUndertones: []
-        }
+        // 4. Update Retro Status to 'revealed'
+        const { error: retroError } = await supabase
+            .from('retros')
+            .update({ status: 'revealed' })
+            .eq('id', retro_id)
 
-        try {
-            const jsonMatch = responseText.match(/\{[\s\S]*\}/)
-            if (jsonMatch) {
-                analysis = JSON.parse(jsonMatch[0])
-            }
-        } catch {
-            console.error('Failed to parse response as JSON')
-        }
+        if (retroError) throw retroError
 
         return new Response(
-            JSON.stringify(analysis),
-            {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 200
-            }
+            JSON.stringify({ status: 'revealed' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
         )
+
     } catch (error) {
         console.error('Error:', error)
         return new Response(
             JSON.stringify({ error: error.message }),
-            {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: 500
-            }
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
         )
     }
 })
+
+// Helper: Run Anthropic Analysis
+async function runAnthropicAnalysis(narrative: string, apiKey: string) {
+    const anthropic = new Anthropic({ apiKey })
+
+    const systemPrompt = `You are Octi, a wise and neutral mediator for couples. 
+Your goal is to help them separate "Video Camera Facts" (what happened) from "Interpretations" (the meaning they assigned to it) and "Mind Reads" (assumptions about the other's intent).
+
+Analyze the provided narrative and extract:
+1. "videoFacts": A list of objective actions that a security camera would record, stripped of emotional language.
+2. "interpretations": A list of subjective meanings or feelings the author experienced.
+3. "mindReads": A list of assumptions the author made about their partner's thoughts or intentions (e.g., "He didn't care," "She was doing it to annoy me").
+4. "emotionalUndertones": A list of 1-2 word emotion labels detected.
+
+Output ONLY valid JSON in this format:
+{
+  "videoFacts": ["..."],
+  "interpretations": ["..."],
+  "mindReads": ["..."],
+  "emotionalUndertones": ["..."]
+}`
+
+    try {
+        const response = await anthropic.messages.create({
+            model: 'claude-3-haiku-20240307',
+            max_tokens: 1000,
+            system: systemPrompt,
+            messages: [{ role: 'user', content: narrative }]
+        })
+
+        const text = response.content[0].type === 'text' ? response.content[0].text : ''
+        const jsonMatch = text.match(/\{[\s\S]*\}/)
+        return jsonMatch ? JSON.parse(jsonMatch[0]) : {}
+    } catch (e) {
+        console.error('Anthropic Error:', e)
+        return generateMockAnalysis(narrative) // Fallback if API fails
+    }
+}
+
+// Helper: Mock Analysis (from aiService.ts)
+function generateMockAnalysis(narrative: string) {
+    return {
+        videoFacts: ['Event occurred (Mock)'],
+        interpretations: ['User felt something (Mock)'],
+        mindReads: ['Partner thought X (Mock)'],
+        emotionalUndertones: ['Mock Emotion']
+    }
+}

@@ -97,7 +97,9 @@ export function CreateRetro() {
                     </p>
 
                     {error && (
-                        <p className="text-red-400 text-sm text-center">{error}</p>
+                        <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-3 mb-4">
+                            <p className="text-red-400 text-sm text-center">{error}</p>
+                        </div>
                     )}
 
                     <Button type="submit" disabled={loading || !title.trim()} className="w-full">

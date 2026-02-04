@@ -5,7 +5,7 @@ import { Button, Card, Textarea } from '../../../shared/components'
 import { fetchSingleRow, fetchRows, updateRow } from '../../../shared/lib/supabaseApi'
 import { useAuth } from '../../auth'
 import type { Retro, RetroSubmission, RetroAIAnalysis } from '../types'
-import { analyzeNarrative, generateMockAnalysis } from '../utils/aiService'
+import { checkRetroStatus, generateMockAnalysis } from '../utils/aiService'
 
 export function RevealView() {
     const { retroId } = useParams<{ retroId: string }>()
@@ -56,47 +56,36 @@ export function RevealView() {
                 setFutureScript(mine.future_script)
             }
 
-            // If not analyzed yet, trigger analysis
+            // If not analyzed yet, trigger check/analysis on server
             if (mine && (!mine.ai_analysis || Object.keys(mine.ai_analysis).length === 0)) {
-                await analyzeSubmissions(submissionsData)
+                setAnalyzing(true)
+                try {
+                    const status = await checkRetroStatus(retroId, accessToken)
+                    if (status.status === 'revealed') {
+                        // Re-fetch data once to get analysis
+                        const { data: freshSubmissions } = await fetchRows<RetroSubmission>(
+                            'retro_submissions',
+                            accessToken,
+                            `&retro_id=eq.${retroId}`
+                        )
+                        if (freshSubmissions) {
+                            setSubmissions(freshSubmissions)
+                            setMySubmission(freshSubmissions.find((s) => s.author_id === profile?.id) || null)
+                            setPartnerSubmission(freshSubmissions.find((s) => s.author_id !== profile?.id) || null)
+                        }
+                    }
+                } catch (e) {
+                    console.error('Status check failed:', e)
+                } finally {
+                    setAnalyzing(false)
+                }
             }
         }
 
         setLoading(false)
     }
 
-    async function analyzeSubmissions(subs: RetroSubmission[]) {
-        if (!accessToken || !retroId) return
-        setAnalyzing(true)
 
-        try {
-            // In production, this would call an Edge Function
-            for (const sub of subs) {
-                const analysis = await generateMockAnalysis(sub.raw_narrative)
-
-                await updateRow(
-                    'retro_submissions',
-                    accessToken,
-                    `id=eq.${sub.id}`,
-                    { ai_analysis: analysis }
-                )
-            }
-
-            // Update retro status to revealed
-            await updateRow(
-                'retros',
-                accessToken,
-                `id=eq.${retroId}`,
-                { status: 'revealed' }
-            )
-
-            await fetchData()
-        } catch (err) {
-            console.error('Analysis failed:', err)
-        } finally {
-            setAnalyzing(false)
-        }
-    }
 
     async function handleSaveScript() {
         if (!mySubmission || !futureScript.trim() || !accessToken) return

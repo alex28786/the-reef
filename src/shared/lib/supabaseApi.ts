@@ -46,7 +46,14 @@ export async function supabaseFetch<T>(
 
         if (!response.ok) {
             const errorText = await response.text()
-            throw new Error(`HTTP ${response.status}: ${errorText}`)
+            let message = errorText
+            try {
+                const parsed = JSON.parse(errorText)
+                message = parsed.message || parsed.error_description || errorText
+            } catch {
+                // Not JSON
+            }
+            throw new Error(message)
         }
 
         // Handle empty responses (204 No Content)
@@ -105,7 +112,6 @@ export async function updateRow<T>(
         single: true
     })
 }
-
 export async function deleteRow(
     table: string,
     accessToken: string,
@@ -116,4 +122,45 @@ export async function deleteRow(
         method: 'DELETE'
     })
     return { error: result.error }
+}
+
+export async function callRpc<T>(
+    functionName: string,
+    accessToken: string,
+    params: Record<string, unknown> = {}
+): Promise<{ data: T | null; error: Error | null }> {
+    try {
+        const headers: Record<string, string> = {
+            'apikey': supabaseAnonKey,
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+        }
+
+        const response = await fetch(
+            `${supabaseUrl}/rest/v1/rpc/${functionName}`,
+            {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(params),
+            }
+        )
+
+        if (!response.ok) {
+            const errorText = await response.text()
+            let message = errorText
+            try {
+                const parsed = JSON.parse(errorText)
+                message = parsed.message || parsed.error_description || errorText
+            } catch {
+                // Not JSON
+            }
+            throw new Error(message)
+        }
+
+        const data = await response.json()
+        return { data, error: null }
+    } catch (err) {
+        console.error(`[callRpc] Error calling ${functionName}:`, err)
+        return { data: null, error: err as Error }
+    }
 }

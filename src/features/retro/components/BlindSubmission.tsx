@@ -4,6 +4,8 @@ import { ArrowLeft, Loader2, CheckCircle, Clock } from 'lucide-react'
 import { Button, Card, Textarea } from '../../../shared/components'
 import { fetchSingleRow, fetchRows, insertRow, updateRow } from '../../../shared/lib/supabaseApi'
 import { useAuth } from '../../auth'
+import { checkRetroStatus } from '../utils/aiService'
+import { callRpc } from '../../../shared/lib/supabaseApi'
 import type { Retro, RetroSubmission } from '../types'
 
 export function BlindSubmission() {
@@ -17,6 +19,7 @@ export function BlindSubmission() {
     const [loading, setLoading] = useState(true)
     const [submitting, setSubmitting] = useState(false)
     const [error, setError] = useState('')
+    const [debugStatus, setDebugStatus] = useState<any>(null)
 
     useEffect(() => {
         if (retroId && profile?.id && accessToken) {
@@ -29,40 +32,48 @@ export function BlindSubmission() {
         setLoading(true)
 
         // Fetch retro
-        const { data: retroData, error: retroError } = await fetchSingleRow<Retro>(
+        const { data: retros, error: retroError } = await fetchRows<Retro>(
             'retros',
             accessToken,
             `&id=eq.${retroId}`
         )
 
-        if (retroError || !retroData) {
-            console.error(retroError)
+        if (retroError || !retros || retros.length === 0) {
+            console.error(retroError || 'Retro not found')
             setLoading(false)
             return
         }
 
+        const retroData = retros[0]
         setRetro(retroData)
 
         // Check for existing submission
-        const { data: submissionData } = await fetchSingleRow<RetroSubmission>(
+        const { data: submissions } = await fetchRows<RetroSubmission>(
             'retro_submissions',
             accessToken,
             `&retro_id=eq.${retroId}&author_id=eq.${profile.id}`
         )
 
-        if (submissionData) {
+        if (submissions && submissions.length > 0) {
+            const submissionData = submissions[0]
             setExistingSubmission(submissionData)
             setNarrative(submissionData.raw_narrative)
         }
 
-        // Check if partner has submitted
-        const { data: partnerSubmissions } = await fetchRows<RetroSubmission>(
-            'retro_submissions',
+        // Check if partner has submitted using the secure RPC
+        const { data: submissionInfos, error: rpcError } = await callRpc<{ author_id: string }[]>(
+            'get_retro_submission_info',
             accessToken,
-            `&retro_id=eq.${retroId}&author_id=neq.${profile.id}`
+            { p_retro_id: retroId }
         )
 
-        setPartnerSubmitted((partnerSubmissions?.length || 0) > 0)
+        if (rpcError) {
+            console.error('Error fetching submission info:', rpcError)
+        } else {
+            const hasPartner = (submissionInfos || []).some(s => s.author_id !== profile.id)
+            setPartnerSubmitted(hasPartner)
+        }
+
         setLoading(false)
     }
 
@@ -101,27 +112,24 @@ export function BlindSubmission() {
                 if (insertError) throw insertError
             }
 
-            // Check if both have now submitted
-            const { data: allSubmissions } = await fetchRows<RetroSubmission>(
-                'retro_submissions',
-                accessToken,
-                `&retro_id=eq.${retroId}`
-            )
+            // Trigger Check Logic (Server Side)
+            setLoading(true)
+            try {
+                const statusResult = await checkRetroStatus(retroId, accessToken)
+                // No longer showing raw debugStatus in production
+                // setDebugStatus(statusResult)
 
-            if (allSubmissions?.length === 2) {
-                // Both submitted - update retro status
-                await updateRow(
-                    'retros',
-                    accessToken,
-                    `id=eq.${retroId}`,
-                    { status: 'submitted' }
-                )
-
-                // Trigger AI analysis (in production, this would call an Edge Function)
-                navigate(`/retro/${retroId}/reveal`)
-            } else {
-                // Waiting for partner
-                await fetchData()
+                if (statusResult.status === 'revealed') {
+                    navigate(`/retro/${retroId}/reveal`)
+                } else {
+                    // Still waiting for partner
+                    await fetchData()
+                    setLoading(false)
+                }
+            } catch (err) {
+                console.error('Status check failed:', err)
+                setDebugStatus({ error: (err as any).message || String(err) })
+                setLoading(false)
             }
         } catch (err) {
             console.error(err)
@@ -217,6 +225,7 @@ export function BlindSubmission() {
                 </Card>
             ) : (
                 <Card>
+                    {/* Errors are shown at the bottom of the card now */}
                     <h2 className="text-lg font-medium text-[var(--color-text)] mb-2">
                         Write your perspective
                     </h2>
@@ -233,7 +242,9 @@ export function BlindSubmission() {
                     />
 
                     {error && (
-                        <p className="text-red-400 text-sm mb-4 text-center">{error}</p>
+                        <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-3 mb-4">
+                            <p className="text-red-400 text-sm text-center">{error}</p>
+                        </div>
                     )}
 
                     <Button
