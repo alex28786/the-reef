@@ -5,13 +5,6 @@ const users = {
     tiff: 'tiff@tiff.de/tifftiff',
 }
 
-const hasSupabaseEnv = Boolean(
-    process.env.VITE_SUPABASE_URL &&
-    !process.env.VITE_SUPABASE_URL.includes('your-project') &&
-    process.env.VITE_SUPABASE_ANON_KEY &&
-    !process.env.VITE_SUPABASE_ANON_KEY.includes('your-anon-key-here')
-)
-
 const login = async (page: any, autologin: string) => {
     const [email, password] = autologin.replace('%26', '&').split('/')
     await page.goto(`/?autologin=${autologin}`)
@@ -23,21 +16,11 @@ const login = async (page: any, autologin: string) => {
         await page.getByRole('button', { name: 'Sign In' }).click()
     }
 
-    await page.waitForTimeout(1000)
-    if (page.url().includes('/login')) {
-        test.skip(true, 'Auth failed; verify Supabase env vars and test credentials.')
-    }
-
     await expect(page).toHaveURL('/', { timeout: 20000 })
     await expect(page.getByText('Welcome to Your Reef')).toBeVisible({ timeout: 20000 })
 }
 
 test.describe('Retro Workflow', () => {
-    test.skip(
-        !hasSupabaseEnv,
-        'Missing Supabase env vars for E2E auth. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.'
-    )
-
     test('Complete retro flow across both users', async ({ browser }) => {
         const contextAlex = await browser.newContext()
         const pageAlex = await contextAlex.newPage()
