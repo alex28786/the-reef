@@ -1,6 +1,8 @@
 import type { AIAnalysis, Horseman } from '../types'
 import { BRIDGE_PROMPTS } from '../types'
-import { supabase } from '../../../shared/lib/supabase'
+import { fetchSingleRow } from '../../../shared/lib/supabaseApi'
+import { buildEdgeHeaders, getAiMockFlag } from '../../../shared/lib/aiConfig'
+import { logger } from '../../../shared/lib/logger'
 
 // Default prompts for local fallback
 const DEFAULT_FOUR_HORSEMEN_PROMPT = `You are an expert in the Gottman Method. Analyze this text for "The Four Horsemen of the Apocalypse" - destructive communication patterns:
@@ -34,22 +36,23 @@ Keep it conversational and genuine.
 TEXT TO REWRITE:
 `
 
-async function getSystemPrompt(key: string, defaultPrompt: string): Promise<string> {
+async function getSystemPrompt(key: string, defaultPrompt: string, accessToken?: string): Promise<string> {
     try {
-        const { data, error } = await supabase
-            .from('system_prompts')
-            .select('prompt_text')
-            .eq('key', key)
-            .single()
-
-        if (error || !data) {
-            console.log(`Using default prompt for ${key}`)
+        const token = accessToken ?? import.meta.env.VITE_SUPABASE_ANON_KEY
+        if (!token) {
             return defaultPrompt
         }
-        if ('prompt_text' in data) {
-            return (data as { prompt_text: string }).prompt_text
+        const { data, error } = await fetchSingleRow<{ prompt_text: string }>(
+            'system_prompts',
+            token,
+            `&key=eq.${key}`
+        )
+
+        if (error || !data) {
+            logger.debug(`Using default prompt for ${key}`)
+            return defaultPrompt
         }
-        return defaultPrompt
+        return data.prompt_text
     } catch {
         return defaultPrompt
     }
@@ -60,32 +63,28 @@ interface AIResponse {
     transformedText: string
 }
 
-export async function analyzeAndTransform(text: string): Promise<AIResponse> {
+export async function analyzeAndTransform(text: string, accessToken?: string): Promise<AIResponse> {
     // Get prompts from database (or use defaults)
     const [fourHorsemenPrompt, nvcPrompt] = await Promise.all([
-        getSystemPrompt(BRIDGE_PROMPTS.FOUR_HORSEMEN, DEFAULT_FOUR_HORSEMEN_PROMPT),
-        getSystemPrompt(BRIDGE_PROMPTS.NVC_TRANSFORM, DEFAULT_NVC_PROMPT),
+        getSystemPrompt(BRIDGE_PROMPTS.FOUR_HORSEMEN, DEFAULT_FOUR_HORSEMEN_PROMPT, accessToken),
+        getSystemPrompt(BRIDGE_PROMPTS.NVC_TRANSFORM, DEFAULT_NVC_PROMPT, accessToken),
     ])
 
     // Call the Edge Function
     const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/bridge-ai`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        },
+        headers: buildEdgeHeaders(accessToken),
         body: JSON.stringify({
             text,
             fourHorsemenPrompt,
             nvcPrompt,
-            mock: true, // Use mock by default in this dev environment/session as requested or toggle via .env
+            mock: getAiMockFlag(),
         }),
     })
 
     if (!response.ok) {
         // Fallback to mock response for development
-        console.warn('Edge function unavailable, using mock response')
+        logger.warn('Edge function unavailable, using mock response')
         return getMockResponse(text)
     }
 

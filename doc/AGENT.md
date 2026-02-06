@@ -265,6 +265,9 @@ headers: {
 # Frontend (.env)
 VITE_SUPABASE_URL=https://project.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJ...
+VITE_AI_USE_MOCK=true            # Optional: force AI mock responses (defaults to DEV)
+VITE_ENABLE_AUTOLOGIN=true       # Optional: allow ?autologin=... in dev
+VITE_LOG_LEVEL=debug             # Optional: debug|info|warn|error|silent
 
 # Edge Functions (Supabase Secrets)
 ANTHROPIC_API_KEY=sk-ant-...
@@ -344,4 +347,3 @@ http://localhost:5173/retro?autologin=tiff@tiff.de/tifftiff
 |-------|----------|------|
 | alex28786@gmail.com | Doffel&6128 | husband |
 | tiff@tiff.de | tifftiff | wife |
-

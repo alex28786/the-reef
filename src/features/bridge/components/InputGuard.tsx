@@ -4,6 +4,8 @@ import type { Emotion, AIAnalysis } from '../types'
 import { EMOTIONS } from '../types'
 import { Button, Card, Textarea } from '../../../shared/components'
 import { analyzeAndTransform } from '../utils/aiService'
+import { useAuth } from '../../auth'
+import { logger } from '../../../shared/lib/logger'
 
 interface InputGuardProps {
     emotion: Emotion
@@ -16,6 +18,7 @@ export function InputGuard({ emotion, initialValue = '', onSubmit, onBack }: Inp
     const [grievance, setGrievance] = useState(initialValue)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
+    const { accessToken } = useAuth()
 
     const selectedEmotion = EMOTIONS.find((e) => e.value === emotion)
 
@@ -26,11 +29,11 @@ export function InputGuard({ emotion, initialValue = '', onSubmit, onBack }: Inp
         setError('')
 
         try {
-            const { analysis, transformedText } = await analyzeAndTransform(grievance)
+            const { analysis, transformedText } = await analyzeAndTransform(grievance, accessToken ?? undefined)
             onSubmit(grievance, analysis, transformedText)
         } catch (err) {
             setError('Failed to process your message. Please try again.')
-            console.error(err)
+            logger.error(err)
         } finally {
             setLoading(false)
         }
