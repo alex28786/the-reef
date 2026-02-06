@@ -12,6 +12,7 @@ const corsHeaders = {
 
 interface RequestBody {
     retro_id: string
+    mock?: boolean
 }
 
 Deno.serve(async (req: Request) => {
@@ -21,7 +22,7 @@ Deno.serve(async (req: Request) => {
     }
 
     try {
-        const { retro_id } = await req.json() as RequestBody
+        const { retro_id, mock } = await req.json() as RequestBody
 
         if (!retro_id) throw new Error('Missing retro_id')
 
@@ -57,7 +58,10 @@ Deno.serve(async (req: Request) => {
 
             // Run Analysis
             let analysis = {}
-            if (anthropicKey) {
+            if (mock) {
+                console.log('Using Mock Analysis')
+                analysis = generateMockAnalysis(sub.raw_narrative)
+            } else if (anthropicKey) {
                 analysis = await runAnthropicAnalysis(sub.raw_narrative, anthropicKey)
             } else {
                 // Should not happen in prod, but safe fallback for tests/local without key
@@ -139,9 +143,9 @@ Output ONLY valid JSON in this format:
 // Helper: Mock Analysis (from aiService.ts)
 function generateMockAnalysis(narrative: string) {
     return {
-        videoFacts: ['Event occurred (Mock)'],
-        interpretations: ['User felt something (Mock)'],
-        mindReads: ['Partner thought X (Mock)'],
-        emotionalUndertones: ['Mock Emotion']
+        videoFacts: ['[MOCK] Event occurred at ' + new Date().toLocaleTimeString(), '[MOCK] Action observed'],
+        interpretations: ['[MOCK] User felt ignored', '[MOCK] Situation interpreted as negative'],
+        mindReads: ['[MOCK] Partner did not care', '[MOCK] Partner was busy'],
+        emotionalUndertones: ['[MOCK] Frustration', '[MOCK] Longing']
     }
 }

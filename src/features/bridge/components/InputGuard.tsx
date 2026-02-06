@@ -7,12 +7,13 @@ import { analyzeAndTransform } from '../utils/aiService'
 
 interface InputGuardProps {
     emotion: Emotion
+    initialValue?: string
     onSubmit: (grievance: string, analysis: AIAnalysis, transformed: string) => void
     onBack: () => void
 }
 
-export function InputGuard({ emotion, onSubmit, onBack }: InputGuardProps) {
-    const [grievance, setGrievance] = useState('')
+export function InputGuard({ emotion, initialValue = '', onSubmit, onBack }: InputGuardProps) {
+    const [grievance, setGrievance] = useState(initialValue)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
 

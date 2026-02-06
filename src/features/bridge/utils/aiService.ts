@@ -11,7 +11,8 @@ const DEFAULT_FOUR_HORSEMEN_PROMPT = `You are an expert in the Gottman Method. A
 4. STONEWALLING: Withdrawing, shutting down, refusing to engage (e.g., "I'm done", "Forget it", "Whatever")
 
 Respond with a JSON object containing:
-- horsemenFlags: array of horsemen found (use lowercase: "criticism", "contempt", "defensiveness", "stonewalling")
+- horsemenFlags: array of horsemen types found (lowercase strings)
+- detectedHorsemen: array of objects with { type, reason, quote } for each horseman found. 'reason' should explain specifically why this text counts as that horseman. 'quote' is the specific excerpt.
 - sentiment: single word describing the overall emotional tone
 - suggestions: array of 1-3 brief suggestions for improvement
 
@@ -78,6 +79,7 @@ export async function analyzeAndTransform(text: string): Promise<AIResponse> {
             text,
             fourHorsemenPrompt,
             nvcPrompt,
+            mock: true, // Use mock by default in this dev environment/session as requested or toggle via .env
         }),
     })
 
@@ -96,17 +98,25 @@ export async function analyzeAndTransform(text: string): Promise<AIResponse> {
 
 // Mock response for development/testing
 function getMockResponse(text: string): AIResponse {
-    const horsemenPatterns: { pattern: RegExp; horseman: Horseman }[] = [
-        { pattern: /you always|you never/i, horseman: 'criticism' },
-        { pattern: /whatever|i'm done|forget it/i, horseman: 'stonewalling' },
-        { pattern: /but you|it's not my fault/i, horseman: 'defensiveness' },
-        { pattern: /eye roll|pathetic|ridiculous/i, horseman: 'contempt' },
+    const horsemenPatterns: { pattern: RegExp; horseman: Horseman; reason: string }[] = [
+        { pattern: /you always|you never/i, horseman: 'criticism', reason: 'Using absolute terms like "always" or "never" attacks character instead of specific behavior.' },
+        { pattern: /whatever|i'm done|forget it/i, horseman: 'stonewalling', reason: 'Withdrawing from the conversation helps no one.' },
+        { pattern: /but you|it's not my fault/i, horseman: 'defensiveness', reason: 'Deflecting blame prevents understanding the core issue.' },
+        { pattern: /eye roll|pathetic|ridiculous/i, horseman: 'contempt', reason: 'Mockery and disrespect are the most destructive predictors of divorce.' },
     ]
 
+    const detectedHorsemen: { type: Horseman; reason: string; quote: string }[] = []
     const horsemenFlags: Horseman[] = []
-    for (const { pattern, horseman } of horsemenPatterns) {
-        if (pattern.test(text)) {
+
+    for (const { pattern, horseman, reason } of horsemenPatterns) {
+        const match = text.match(pattern)
+        if (match) {
             horsemenFlags.push(horseman)
+            detectedHorsemen.push({
+                type: horseman,
+                reason,
+                quote: match[0]
+            })
         }
     }
 
@@ -116,6 +126,7 @@ function getMockResponse(text: string): AIResponse {
     return {
         analysis: {
             horsemenFlags,
+            detectedHorsemen,
             sentiment: horsemenFlags.length > 0 ? 'tense' : 'neutral',
             suggestions: horsemenFlags.length > 0
                 ? ['Try using "I feel" statements', 'Focus on specific behaviors, not character']

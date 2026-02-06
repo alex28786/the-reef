@@ -28,7 +28,10 @@ export async function checkRetroStatus(retroId: string, accessToken?: string): P
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${accessToken || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
             },
-            body: JSON.stringify({ retro_id: retroId }),
+            body: JSON.stringify({
+                retro_id: retroId,
+                mock: true // Enabled for testing/dev 
+            }),
         })
 
         if (response.ok) {

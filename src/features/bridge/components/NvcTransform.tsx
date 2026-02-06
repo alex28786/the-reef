@@ -61,18 +61,38 @@ export function NvcTransform({
                             <p className="font-medium text-[var(--color-text)] mb-2">
                                 Seal noticed some patterns
                             </p>
-                            <div className="space-y-2">
-                                {aiAnalysis.horsemenFlags?.map((horseman) => {
-                                    const info = HORSEMAN_INFO[horseman]
-                                    return (
-                                        <div key={horseman} className="flex items-center gap-2">
-                                            <span className={`font-medium ${info.color}`}>{info.label}</span>
-                                            <span className="text-[var(--color-text-muted)] text-sm">
-                                                – {info.description}
-                                            </span>
-                                        </div>
-                                    )
-                                })}
+                            <div className="space-y-4">
+                                {(aiAnalysis.detectedHorsemen && aiAnalysis.detectedHorsemen.length > 0) ? (
+                                    aiAnalysis.detectedHorsemen.map((detection, i) => {
+                                        const info = HORSEMAN_INFO[detection.type]
+                                        return (
+                                            <div key={i} className="bg-[var(--color-surface)] p-3 rounded-lg border border-[var(--color-surface-hover)]">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <span className={`font-medium ${info.color}`}>{info.label}</span>
+                                                    <span className="text-[var(--color-text-muted)] text-xs uppercase tracking-wider">detected</span>
+                                                </div>
+                                                <p className="text-sm text-[var(--color-text)] mb-2">
+                                                    "{detection.quote}"
+                                                </p>
+                                                <p className="text-sm text-[var(--color-text-muted)] italic">
+                                                    {detection.reason}
+                                                </p>
+                                            </div>
+                                        )
+                                    })
+                                ) : (
+                                    aiAnalysis.horsemenFlags?.map((horseman) => {
+                                        const info = HORSEMAN_INFO[horseman]
+                                        return (
+                                            <div key={horseman} className="flex items-center gap-2">
+                                                <span className={`font-medium ${info.color}`}>{info.label}</span>
+                                                <span className="text-[var(--color-text-muted)] text-sm">
+                                                    – {info.description}
+                                                </span>
+                                            </div>
+                                        )
+                                    })
+                                )}
                             </div>
                         </div>
                     </div>

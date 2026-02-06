@@ -32,7 +32,7 @@ export function Layout({ children }: LayoutProps) {
                         <div className="flex items-center gap-4">
                             <div className="flex items-center gap-2 text-[var(--color-text-muted)]">
                                 <User size={18} />
-                                <span className="text-sm hidden sm:inline">{profile.display_name}</span>
+                                <span className="text-sm font-medium text-[var(--color-text)]">{profile.display_name}</span>
                             </div>
                             <button
                                 onClick={signOut}

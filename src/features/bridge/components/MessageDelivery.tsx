@@ -3,7 +3,7 @@ import { ArrowLeft, Send, Loader2, CheckCircle } from 'lucide-react'
 import type { Emotion } from '../types'
 import { EMOTIONS } from '../types'
 import { Button, Card } from '../../../shared/components'
-import { fetchSingleRow, insertRow } from '../../../shared/lib/supabaseApi'
+import { fetchRows, insertRow } from '../../../shared/lib/supabaseApi'
 import { useAuth } from '../../auth'
 
 interface MessageDeliveryProps {
@@ -36,15 +36,26 @@ export function MessageDelivery({
         setError('')
 
         try {
-            // Get partner's profile
-            const { data: partnerData, error: partnerError } = await fetchSingleRow<{ id: string }>(
+            // Get all profiles in the reef to find partner
+            const { data: profiles, error: profilesError } = await fetchRows<any>(
                 'profiles',
                 accessToken,
-                `&reef_id=eq.${profile.reef_id}&id=neq.${profile.id}`
+                `&reef_id=eq.${profile.reef_id}`
             )
 
-            if (partnerError || !partnerData) {
-                throw new Error('Could not find your partner')
+            if (profilesError || !profiles) {
+                console.error('Error fetching profiles:', profilesError)
+                throw new Error('Could not verify reef members')
+            }
+
+            console.log('Reef Members:', profiles)
+            let partnerData = profiles.find((p: any) => p.id !== profile.id)
+
+            if (!partnerData) {
+                // For testing/dev, if ONLY 1 member exists, maybe allow proceed or warn?
+                // But for now, just informative error
+                console.warn('No partner found in reef:', profile.reef_id)
+                throw new Error('Could not find your partner. Are they linked to your reef? (Reef ID: ' + profile.reef_id + ')')
             }
 
             // Insert bridge message
@@ -56,7 +67,7 @@ export function MessageDelivery({
                     sender_id: profile.id,
                     recipient_id: partnerData.id,
                     emotion,
-                    original_text: transformedText, // In production, store both original and transformed
+                    original_text: transformedText,
                     transformed_text: transformedText,
                     ai_analysis: {},
                 }
@@ -68,7 +79,7 @@ export function MessageDelivery({
             setTimeout(onSent, 2000)
         } catch (err) {
             console.error(err)
-            setError('Failed to send message. Please try again.')
+            setError(err instanceof Error ? err.message : 'Failed to send message. Please try again.')
         } finally {
             setLoading(false)
         }

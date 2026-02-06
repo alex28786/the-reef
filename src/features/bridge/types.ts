@@ -27,8 +27,15 @@ export type Horseman =
     | 'defensiveness'
     | 'stonewalling'
 
+export interface HorsemanDetection {
+    type: Horseman
+    reason: string
+    quote: string
+}
+
 export interface AIAnalysis {
     horsemenFlags?: Horseman[]
+    detectedHorsemen?: HorsemanDetection[]
     sentiment?: string
     suggestions?: string[]
     nvcRewrite?: string

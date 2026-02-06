@@ -84,6 +84,7 @@ export function BridgePage() {
                 {step === 'input' && formData.emotion && (
                     <InputGuard
                         emotion={formData.emotion}
+                        initialValue={formData.grievance}
                         onSubmit={handleGrievanceSubmit}
                         onBack={handleBack}
                     />

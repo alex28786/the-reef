@@ -13,6 +13,7 @@ interface RequestBody {
     text: string
     fourHorsemenPrompt: string
     nvcPrompt: string
+    mock?: boolean
 }
 
 Deno.serve(async (req: Request) => {
@@ -22,12 +23,36 @@ Deno.serve(async (req: Request) => {
     }
 
     try {
+        const { text, fourHorsemenPrompt, nvcPrompt, mock } = await req.json() as RequestBody
+
+        // MOCK MODE
+        if (mock) {
+            console.log('Using Mock Mode')
+            return new Response(
+                JSON.stringify({
+                    analysis: {
+                        horsemenFlags: ['criticism'],
+                        detectedHorsemen: [{
+                            type: 'criticism',
+                            reason: 'Mock Reason: Used "always/never"',
+                            quote: text.substring(0, 20)
+                        }],
+                        sentiment: 'tense',
+                        suggestions: ['Try using "I feel" statements']
+                    },
+                    transformedText: `[MOCK] I feel frustrated when I see ${text} because I need support.`
+                }),
+                {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                    status: 200
+                }
+            )
+        }
+
         const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')
         if (!anthropicKey) {
             throw new Error('ANTHROPIC_API_KEY not configured')
         }
-
-        const { text, fourHorsemenPrompt, nvcPrompt } = await req.json() as RequestBody
 
         const anthropic = new Anthropic({ apiKey: anthropicKey })
 
