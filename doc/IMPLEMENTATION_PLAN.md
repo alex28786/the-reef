@@ -43,6 +43,7 @@ Core features implemented:
 - [x] Add unit tests (Vitest) ✅ 29 tests
 - [x] Add E2E tests (Playwright) ✅ 4 tests
 - [x] Add AI/config toggles + logging policy for agent-friendly workflows ✅
+- [x] Harden edge functions (auth checks, mock gating, response validation) ✅
 - [ ] Regenerate Supabase types after schema changes
 - [x] Clean up console.log debug statements (partial)
 

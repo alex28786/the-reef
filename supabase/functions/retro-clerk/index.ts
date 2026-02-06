@@ -15,10 +15,53 @@ interface RequestBody {
     mock?: boolean
 }
 
+interface AuthContext {
+    userId: string
+    reefId: string
+}
+
+async function getAuthContext(req: Request, requestId: string): Promise<AuthContext> {
+    const authHeader = req.headers.get('Authorization') ?? ''
+    const token = authHeader.replace('Bearer ', '').trim()
+    if (!token) {
+        throw new Error('Missing Authorization token')
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
+    if (!supabaseUrl || !supabaseAnonKey) {
+        throw new Error('Missing SUPABASE_URL or SUPABASE_ANON_KEY')
+    }
+
+    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+        auth: { persistSession: false },
+        global: { headers: { Authorization: `Bearer ${token}` } }
+    })
+
+    const { data: userData, error: userError } = await authClient.auth.getUser(token)
+    if (userError || !userData?.user) {
+        throw new Error('Invalid auth token')
+    }
+
+    const { data: profile, error: profileError } = await authClient
+        .from('profiles')
+        .select('reef_id')
+        .eq('id', userData.user.id)
+        .maybeSingle()
+
+    if (profileError || !profile?.reef_id) {
+        console.error('Profile missing reef_id', requestId)
+        throw new Error('Profile missing reef assignment')
+    }
+
+    return { userId: userData.user.id, reefId: profile.reef_id }
+}
+
 Deno.serve(async (req: Request) => {
+    const requestId = crypto.randomUUID()
     // Handle CORS preflight
     if (req.method === 'OPTIONS') {
-        return new Response(null, { headers: corsHeaders })
+        return new Response(null, { headers: { ...corsHeaders, 'x-request-id': requestId } })
     }
 
     try {
@@ -26,12 +69,33 @@ Deno.serve(async (req: Request) => {
 
         if (!retro_id) throw new Error('Missing retro_id')
 
+        const { reefId } = await getAuthContext(req, requestId)
+
         const supabaseUrl = Deno.env.get('SUPABASE_URL')!
         const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
         const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')
+        const allowMock = Deno.env.get('ALLOW_MOCK') === 'true'
+        const useMock = Boolean(mock && allowMock)
 
         // Initialize Supabase Admin Client (Bypass RLS)
         const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+        const { data: retro, error: retroFetchError } = await supabase
+            .from('retros')
+            .select('id, reef_id')
+            .eq('id', retro_id)
+            .maybeSingle()
+
+        if (retroFetchError || !retro) {
+            throw new Error('Retro not found')
+        }
+
+        if (retro.reef_id !== reefId) {
+            return new Response(
+                JSON.stringify({ error: 'Forbidden' }),
+                { headers: { ...corsHeaders, 'Content-Type': 'application/json', 'x-request-id': requestId }, status: 403 }
+            )
+        }
 
         // 1. Fetch Submissions
         const { data: submissions, error: fetchError } = await supabase
@@ -58,8 +122,8 @@ Deno.serve(async (req: Request) => {
 
             // Run Analysis
             let analysis = {}
-            if (mock) {
-                console.log('Using Mock Analysis')
+            if (useMock) {
+                console.log('Using Mock Analysis', requestId)
                 analysis = generateMockAnalysis(sub.raw_narrative)
             } else if (anthropicKey) {
                 analysis = await runAnthropicAnalysis(sub.raw_narrative, anthropicKey)
@@ -90,14 +154,14 @@ Deno.serve(async (req: Request) => {
 
         return new Response(
             JSON.stringify({ status: 'revealed' }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json', 'x-request-id': requestId }, status: 200 }
         )
 
     } catch (error) {
         console.error('Error:', error)
         return new Response(
             JSON.stringify({ error: error.message }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json', 'x-request-id': requestId }, status: 500 }
         )
     }
 })

@@ -271,6 +271,8 @@ VITE_LOG_LEVEL=debug             # Optional: debug|info|warn|error|silent
 
 # Edge Functions (Supabase Secrets)
 ANTHROPIC_API_KEY=sk-ant-...
+ALLOW_MOCK=false               # Optional: allow mock payloads in edge functions
+SUPABASE_ANON_KEY=eyJ...        # Required for edge auth checks
 ```
 
 ---
