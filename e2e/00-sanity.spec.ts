@@ -26,15 +26,26 @@ const loginViaForm = async (page: any, credentials: { email: string; password: s
     const welcome = page.getByText('Welcome to Your Reef')
     const notLinked = page.getByRole('heading', { name: 'Welcome to The Reef!' })
     const loginStillVisible = page.getByRole('heading', { name: 'The Reef' })
+    const errorMessage = page.locator('.text-red-500, [role="alert"]')
+
+    // Wait for the loading state to appear and then disappear to ensure auth processing is done
+    // The "Loading..." text or the bouncing shell 🐚 might appear
+    await expect(page.getByText('Loading...')).toBeVisible({ timeout: 5000 }).catch(() => { })
+    await expect(page.getByText('Loading...')).toBeHidden({ timeout: 20000 })
 
     const winner = await Promise.race([
         welcome.waitFor({ state: 'visible', timeout: 20000 }).then(() => 'welcome'),
         notLinked.waitFor({ state: 'visible', timeout: 20000 }).then(() => 'not-linked'),
-        loginStillVisible.waitFor({ state: 'visible', timeout: 20000 }).then(() => 'login'),
+        errorMessage.waitFor({ state: 'visible', timeout: 20000 }).then(() => 'error'),
     ])
 
+    if (winner === 'error') {
+        throw new Error('Login failed: error message displayed.')
+    }
+
     if (winner === 'login') {
-        throw new Error('Login failed: still on login screen after sign-in.')
+        // This case is impossible now as we removed it from race, but keeping logic structure
+        throw new Error('Login failed: unknown reason.')
     }
 
     if (winner === 'not-linked') {
@@ -51,7 +62,7 @@ test.describe.serial('Sanity Checks', () => {
         fs.rmSync(markerPath, { force: true })
     })
 
-    test.afterEach(({}, testInfo) => {
+    test.afterEach(({ }, testInfo) => {
         if (testInfo.status !== testInfo.expectedStatus) {
             sanityOk = false
         }

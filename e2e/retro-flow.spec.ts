@@ -1,5 +1,4 @@
-import fs from 'node:fs'
-import path from 'node:path'
+
 import { test, expect } from '@playwright/test'
 
 const users = {
@@ -7,7 +6,7 @@ const users = {
     tiff: process.env.VITE_TEST_USER_B ?? '',
 }
 
-const markerPath = path.join(process.cwd(), '.e2e-auth-ok')
+
 
 const login = async (page: any, autologin: string) => {
     const [email, password] = autologin.split('/')
@@ -23,6 +22,11 @@ const login = async (page: any, autologin: string) => {
 
     const welcome = page.getByText('Welcome to Your Reef')
     const loginStillVisible = page.getByRole('heading', { name: 'The Reef' })
+
+    // Wait for loading to finish
+    await expect(page.getByText('Loading...')).toBeVisible({ timeout: 5000 }).catch(() => { })
+    await expect(page.getByText('Loading...')).toBeHidden({ timeout: 20000 })
+
     const winner = await Promise.race([
         welcome.waitFor({ state: 'visible', timeout: 20000 }).then(() => 'welcome'),
         loginStillVisible.waitFor({ state: 'visible', timeout: 20000 }).then(() => 'login'),
@@ -37,16 +41,12 @@ const login = async (page: any, autologin: string) => {
 }
 
 test.describe('Retro Workflow', () => {
+    // Check for required environment variables
     test.beforeAll(() => {
-        if (!fs.existsSync(markerPath)) {
-            test.skip(true, 'Sanity checks did not pass; skipping feature E2E tests.')
+        if (!users.alex || !users.tiff) {
+            throw new Error('Missing VITE_TEST_USER_A or VITE_TEST_USER_B. Cannot run E2E tests.')
         }
     })
-
-    test.skip(
-        !users.alex || !users.tiff,
-        'Missing VITE_TEST_USER_A or VITE_TEST_USER_B for E2E tests.'
-    )
 
     test('Complete retro flow across both users', async ({ browser }) => {
         const contextAlex = await browser.newContext()
@@ -87,10 +87,14 @@ test.describe('Retro Workflow', () => {
 
         await expect(pageTiff.getByText('The Reveal')).toBeVisible()
         await expect(pageTiff.getByText(retroTitle)).toBeVisible()
-        await expect(pageTiff.getByRole('heading', { name: 'Video Camera Facts' })).toBeVisible()
-        await expect(pageTiff.getByRole('heading', { name: 'Interpretations' })).toBeVisible()
 
-        const videoFacts = pageTiff.locator('.text-green-400').locator('..').locator('..').locator('li')
+        // Both users' columns should be visible, so headings appear twice
+        await expect(pageTiff.getByRole('heading', { name: 'Video Camera Facts' })).toHaveCount(2)
+        await expect(pageTiff.getByRole('heading', { name: 'Interpretations' })).toHaveCount(2)
+
+        // Locate facts relative to the heading to be robust against color changes
+        const factsHeading = pageTiff.getByRole('heading', { name: 'Video Camera Facts' }).first()
+        const videoFacts = factsHeading.locator('..').locator('ul > li')
         await expect(videoFacts.first()).toBeVisible()
 
         await pageAlex.reload()

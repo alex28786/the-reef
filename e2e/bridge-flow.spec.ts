@@ -1,5 +1,4 @@
-import fs from 'node:fs'
-import path from 'node:path'
+
 import { test, expect } from '@playwright/test'
 
 const users = {
@@ -7,7 +6,7 @@ const users = {
     tiff: process.env.VITE_TEST_USER_B ?? '',
 }
 
-const markerPath = path.join(process.cwd(), '.e2e-auth-ok')
+
 
 const login = async (page: any, autologin: string) => {
     const [email, password] = autologin.split('/')
@@ -23,9 +22,14 @@ const login = async (page: any, autologin: string) => {
 
     const welcome = page.getByText('Welcome to Your Reef')
     const loginStillVisible = page.getByRole('heading', { name: 'The Reef' })
+
+    // Wait for loading to finish
+    await expect(page.getByText('Loading...')).toBeVisible({ timeout: 5000 }).catch(() => { })
+    await expect(page.getByText('Loading...')).toBeHidden({ timeout: 20000 })
+
     const winner = await Promise.race([
         welcome.waitFor({ state: 'visible', timeout: 20000 }).then(() => 'welcome'),
-        loginStillVisible.waitFor({ state: 'visible', timeout: 20000 }).then(() => 'login'),
+        loginStillVisible.waitFor({ state: 'visible', timeout: 20000 }).then(() => 'login'), // Keeping this for now but with loading wait it should be safer
     ])
 
     if (winner === 'login') {
@@ -57,16 +61,12 @@ const getLatestBridgeMessage = async (page: any) => {
 }
 
 test.describe('Bridge Workflow', () => {
+    // Check for required environment variables
     test.beforeAll(() => {
-        if (!fs.existsSync(markerPath)) {
-            test.skip(true, 'Sanity checks did not pass; skipping feature E2E tests.')
+        if (!users.alex || !users.tiff) {
+            throw new Error('Missing VITE_TEST_USER_A or VITE_TEST_USER_B. Cannot run E2E tests.')
         }
     })
-
-    test.skip(
-        !users.alex || !users.tiff,
-        'Missing VITE_TEST_USER_A or VITE_TEST_USER_B for E2E tests.'
-    )
 
     test('Send a bridge message and verify recipient sees it', async ({ browser }) => {
         const contextAlex = await browser.newContext()

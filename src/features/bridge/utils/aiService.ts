@@ -70,28 +70,33 @@ export async function analyzeAndTransform(text: string, accessToken?: string): P
         getSystemPrompt(BRIDGE_PROMPTS.NVC_TRANSFORM, DEFAULT_NVC_PROMPT, accessToken),
     ])
 
-    // Call the Edge Function
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/bridge-ai`, {
-        method: 'POST',
-        headers: buildEdgeHeaders(accessToken),
-        body: JSON.stringify({
-            text,
-            fourHorsemenPrompt,
-            nvcPrompt,
-            mock: getAiMockFlag(),
-        }),
-    })
+    try {
+        // Call the Edge Function
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/bridge-ai`, {
+            method: 'POST',
+            headers: buildEdgeHeaders(accessToken),
+            body: JSON.stringify({
+                text,
+                fourHorsemenPrompt,
+                nvcPrompt,
+                mock: getAiMockFlag(),
+            }),
+        })
 
-    if (!response.ok) {
-        // Fallback to mock response for development
-        logger.warn('Edge function unavailable, using mock response')
+        if (!response.ok) {
+            // Fallback to mock response for development
+            logger.warn('Edge function unavailable (status ' + response.status + '), using mock response')
+            return getMockResponse(text)
+        }
+
+        const data = await response.json()
+        return {
+            analysis: data.analysis,
+            transformedText: data.transformedText,
+        }
+    } catch (err) {
+        logger.warn('Edge function fetch failed, using mock response:', err)
         return getMockResponse(text)
-    }
-
-    const data = await response.json()
-    return {
-        analysis: data.analysis,
-        transformedText: data.transformedText,
     }
 }
 

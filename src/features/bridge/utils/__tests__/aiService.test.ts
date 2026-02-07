@@ -46,6 +46,7 @@ describe('bridge aiService', () => {
         const result = await analyzeAndTransform('You always do this', 'token')
 
         expect(result.transformedText).toContain('I\'m feeling upset')
-        expect(result.analysis.horsemenFlags.length).toBeGreaterThan(0)
+        expect(result.analysis.horsemenFlags).toBeDefined()
+        expect(result.analysis.horsemenFlags!.length).toBeGreaterThan(0)
     })
 })

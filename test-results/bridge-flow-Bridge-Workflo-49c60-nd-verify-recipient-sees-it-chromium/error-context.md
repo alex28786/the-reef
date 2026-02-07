@@ -1,0 +1,51 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - link "🐚 The Reef" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e7]: 🐚
+        - generic [ref=e8]: The Reef
+      - generic [ref=e9]:
+        - generic [ref=e10]:
+          - img [ref=e11]
+          - generic [ref=e14]: Alex
+        - button "Sign out" [ref=e15]:
+          - img [ref=e16]
+  - main [ref=e19]:
+    - generic [ref=e21]:
+      - generic [ref=e22]:
+        - generic [ref=e23]: 🦭
+        - heading "The Bridge" [level=1] [ref=e24]
+        - paragraph [ref=e25]: Let Seal guide you through expressing your feelings
+      - generic [ref=e32]:
+        - button "Back" [ref=e33]:
+          - img [ref=e34]
+          - generic [ref=e36]: Back
+        - generic [ref=e37]:
+          - generic [ref=e38]:
+            - generic [ref=e39]: 😠
+            - generic [ref=e40]:
+              - paragraph [ref=e41]: You're feeling
+              - paragraph [ref=e42]: Angry
+          - generic [ref=e43]:
+            - generic [ref=e44]: What's on your mind?
+            - textbox "Express what you're experiencing. Be honest – Seal will help you communicate it kindly..." [ref=e45]: You always ignore me about dinner plans 1770473802468
+          - paragraph [ref=e46]: 🦭 Seal will check for communication patterns and suggest a gentler way to express your feelings
+          - button "Processing..." [disabled] [ref=e47]:
+            - img [ref=e48]
+            - text: Processing...
+  - navigation [ref=e50]:
+    - link "🦭 The Bridge" [ref=e51] [cursor=pointer]:
+      - /url: /bridge
+      - generic [ref=e52]: 🦭
+      - img [ref=e53]
+      - generic [ref=e55]: The Bridge
+    - link "🐙 The Retro" [ref=e56] [cursor=pointer]:
+      - /url: /retro
+      - generic [ref=e57]: 🐙
+      - img [ref=e58]
+      - generic [ref=e62]: The Retro
+```
