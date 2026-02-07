@@ -1,9 +1,13 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import { test, expect } from '@playwright/test'
 
 const users = {
     alex: process.env.VITE_TEST_USER_A ?? '',
     tiff: process.env.VITE_TEST_USER_B ?? '',
 }
+
+const markerPath = path.join(process.cwd(), '.e2e-auth-ok')
 
 const login = async (page: any, autologin: string) => {
     const [email, password] = autologin.split('/')
@@ -33,6 +37,12 @@ const login = async (page: any, autologin: string) => {
 }
 
 test.describe('Retro Workflow', () => {
+    test.beforeAll(() => {
+        if (!fs.existsSync(markerPath)) {
+            test.skip(true, 'Sanity checks did not pass; skipping feature E2E tests.')
+        }
+    })
+
     test.skip(
         !users.alex || !users.tiff,
         'Missing VITE_TEST_USER_A or VITE_TEST_USER_B for E2E tests.'

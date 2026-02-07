@@ -1,9 +1,13 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import { test, expect } from '@playwright/test'
 
 const users = {
     alex: process.env.VITE_TEST_USER_A ?? '',
     tiff: process.env.VITE_TEST_USER_B ?? '',
 }
+
+const markerPath = path.join(process.cwd(), '.e2e-auth-ok')
 
 const parseCredentials = (value: string) => {
     const [email, password] = value.split('/')
@@ -20,16 +24,31 @@ const loginViaForm = async (page: any, credentials: { email: string; password: s
     await page.getByRole('button', { name: 'Sign In' }).click()
 
     const welcome = page.getByText('Welcome to Your Reef')
-    const loginStillVisible = page.getByRole('heading', { name: 'The Reef' })
-    const winner = await Promise.race([
-        welcome.waitFor({ state: 'visible', timeout: 20000 }).then(() => 'welcome'),
-        loginStillVisible.waitFor({ state: 'visible', timeout: 20000 }).then(() => 'login'),
-    ])
-
-    return winner === 'welcome'
+    await expect(welcome).toBeVisible({ timeout: 20000 })
+    await expect(page).toHaveURL('/', { timeout: 20000 })
 }
 
-test.describe('Sanity Checks', () => {
+test.describe.serial('Sanity Checks', () => {
+    let sanityOk = true
+
+    test.beforeAll(() => {
+        fs.rmSync(markerPath, { force: true })
+    })
+
+    test.afterEach(({}, testInfo) => {
+        if (testInfo.status !== testInfo.expectedStatus) {
+            sanityOk = false
+        }
+    })
+
+    test.afterAll(() => {
+        if (sanityOk) {
+            fs.writeFileSync(markerPath, 'ok')
+        } else {
+            fs.rmSync(markerPath, { force: true })
+        }
+    })
+
     test('Login page loads', async ({ page }) => {
         await page.goto('/')
         await expect(page).toHaveURL(/\/login/)
@@ -39,19 +58,13 @@ test.describe('Sanity Checks', () => {
     test('Sign in as Alex via form', async ({ page }) => {
         test.skip(!users.alex, 'Missing VITE_TEST_USER_A for E2E tests.')
         const { email, password } = parseCredentials(users.alex)
-
-        if (!await loginViaForm(page, { email, password })) {
-            test.skip(true, 'Login failed for user A; verify Supabase auth and credentials.')
-        }
+        await loginViaForm(page, { email, password })
     })
 
     test('Sign in as Tiff via form', async ({ page }) => {
         test.skip(!users.tiff, 'Missing VITE_TEST_USER_B for E2E tests.')
         const { email, password } = parseCredentials(users.tiff)
-
-        if (!await loginViaForm(page, { email, password })) {
-            test.skip(true, 'Login failed for user B; verify Supabase auth and credentials.')
-        }
+        await loginViaForm(page, { email, password })
     })
 
     test('Autologin works', async ({ page }) => {
@@ -60,18 +73,7 @@ test.describe('Sanity Checks', () => {
         const encoded = `${encodeURIComponent(email)}/${encodeURIComponent(password)}`
 
         await page.goto(`/?autologin=${encoded}`)
-
-        const welcome = page.getByText('Welcome to Your Reef')
-        const loginStillVisible = page.getByRole('heading', { name: 'The Reef' })
-        const winner = await Promise.race([
-            welcome.waitFor({ state: 'visible', timeout: 20000 }).then(() => 'welcome'),
-            loginStillVisible.waitFor({ state: 'visible', timeout: 20000 }).then(() => 'login'),
-        ])
-
-        if (winner === 'login') {
-            test.skip(true, 'Autologin failed; verify Supabase auth and credentials.')
-        }
-
+        await expect(page.getByText('Welcome to Your Reef')).toBeVisible({ timeout: 20000 })
         await expect(page).toHaveURL('/', { timeout: 20000 })
     })
 })
