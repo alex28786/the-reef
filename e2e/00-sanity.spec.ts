@@ -24,7 +24,23 @@ const loginViaForm = async (page: any, credentials: { email: string; password: s
     await page.getByRole('button', { name: 'Sign In' }).click()
 
     const welcome = page.getByText('Welcome to Your Reef')
-    await expect(welcome).toBeVisible({ timeout: 20000 })
+    const notLinked = page.getByRole('heading', { name: 'Welcome to The Reef!' })
+    const loginStillVisible = page.getByRole('heading', { name: 'The Reef' })
+
+    const winner = await Promise.race([
+        welcome.waitFor({ state: 'visible', timeout: 20000 }).then(() => 'welcome'),
+        notLinked.waitFor({ state: 'visible', timeout: 20000 }).then(() => 'not-linked'),
+        loginStillVisible.waitFor({ state: 'visible', timeout: 20000 }).then(() => 'login'),
+    ])
+
+    if (winner === 'login') {
+        throw new Error('Login failed: still on login screen after sign-in.')
+    }
+
+    if (winner === 'not-linked') {
+        throw new Error('Login succeeded but profile lacks reef_id (not linked to a reef).')
+    }
+
     await expect(page).toHaveURL('/', { timeout: 20000 })
 }
 
