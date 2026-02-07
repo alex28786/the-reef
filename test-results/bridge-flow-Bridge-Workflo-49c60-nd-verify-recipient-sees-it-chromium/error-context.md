@@ -32,7 +32,7 @@
               - paragraph [ref=e42]: Angry
           - generic [ref=e43]:
             - generic [ref=e44]: What's on your mind?
-            - textbox "Express what you're experiencing. Be honest – Seal will help you communicate it kindly..." [ref=e45]: You always ignore me about dinner plans 1770473802468
+            - textbox "Express what you're experiencing. Be honest – Seal will help you communicate it kindly..." [ref=e45]: You always ignore me about dinner plans [REF:Test Run 1770490382752]
           - paragraph [ref=e46]: 🦭 Seal will check for communication patterns and suggest a gentler way to express your feelings
           - button "Processing..." [disabled] [ref=e47]:
             - img [ref=e48]

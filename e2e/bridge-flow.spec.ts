@@ -40,8 +40,8 @@ const login = async (page: any, autologin: string) => {
     return true
 }
 
-const getLatestBridgeMessage = async (page: any) => {
-    return page.evaluate(async () => {
+const getBridgeMessageByContent = async (page: any, uniqueId: string) => {
+    return page.evaluate(async (id: string) => {
         const key = Object.keys(localStorage).find(
             (entry) => entry.startsWith('sb-') && entry.endsWith('-auth-token')
         )
@@ -51,13 +51,19 @@ const getLatestBridgeMessage = async (page: any) => {
         if (!session?.access_token || !session?.user?.id) return null
 
         const { fetchRows } = await import('/src/shared/lib/supabaseApi.ts')
+
+        // Filter by content containing our unique ID
+        console.log('Querying for content ID:', id)
+        const query = `&recipient_id=eq.${session.user.id}&original_text=ilike.%${encodeURIComponent(id)}%&limit=1`
+
         const result = await fetchRows(
             'bridge_messages',
             session.access_token,
-            `&recipient_id=eq.${session.user.id}&order=created_at.desc&limit=1`
+            query
         )
+        console.log('Fetch Result:', JSON.stringify(result))
         return result.data?.[0] ?? null
-    })
+    }, uniqueId)
 }
 
 test.describe('Bridge Workflow', () => {
@@ -69,6 +75,8 @@ test.describe('Bridge Workflow', () => {
     })
 
     test('Send a bridge message and verify recipient sees it', async ({ browser }) => {
+        const uniqueId = `Test Run ${Date.now()}`
+        console.log('TEST ID:', uniqueId)
         const contextAlex = await browser.newContext()
         const pageAlex = await contextAlex.newPage()
         if (!await login(pageAlex, users.alex)) {
@@ -77,7 +85,7 @@ test.describe('Bridge Workflow', () => {
 
         await pageAlex.goto('/bridge')
         await pageAlex.getByRole('button', { name: 'Angry' }).click()
-        await pageAlex.fill('textarea', `You always ignore me about dinner plans ${Date.now()}`)
+        await pageAlex.fill('textarea', `You always ignore me about dinner plans [REF:${uniqueId}]`)
         await pageAlex.getByRole('button', { name: 'Let Seal Help' }).click()
         await expect(pageAlex.getByText("Seal's gentle rewrite:")).toBeVisible()
         await pageAlex.getByRole('button', { name: 'Send This Version' }).click()
@@ -87,11 +95,13 @@ test.describe('Bridge Workflow', () => {
 
         const contextTiff = await browser.newContext()
         const pageTiff = await contextTiff.newPage()
+        pageTiff.on('console', msg => console.log('PAGE LOG:', msg.text()))
         if (!await login(pageTiff, users.tiff)) {
             test.skip(true, 'E2E login failed for user B; verify Supabase auth and test users exist.')
         }
 
-        await expect.poll(async () => getLatestBridgeMessage(pageTiff), {
+        // Poll for the SPECIFIC message containing our unique ID
+        await expect.poll(async () => getBridgeMessageByContent(pageTiff, uniqueId), {
             timeout: 15000,
         }).toMatchObject({
             emotion: 'angry',
