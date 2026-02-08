@@ -2,17 +2,7 @@ import type { RetroAIAnalysis } from '../types'
 import { buildEdgeHeaders, getAiMockFlag } from '../../../shared/lib/aiConfig'
 import { logger } from '../../../shared/lib/logger'
 
-const DEFAULT_CLERK_PROMPT = `You are Octi, a wise and compassionate AI assistant helping a couple understand their different perspectives of the same event.
 
-Analyze this narrative and extract:
-1. VIDEO CAMERA FACTS - Things a neutral camera would record (observable actions, words spoken, times, places)
-2. INTERPRETATIONS - Subjective readings of the situation, feelings, conclusions drawn
-3. MIND READS - Assumptions about what the other person was thinking or intending
-
-Be gentle but honest. The goal is understanding, not blame.
-
-NARRATIVE:
-`
 
 // Response type from Edge Function
 export interface RetroStatusResponse {
@@ -42,42 +32,38 @@ export async function checkRetroStatus(retroId: string, accessToken?: string): P
 }
 
 export async function generateMockAnalysis(narrative: string): Promise<RetroAIAnalysis> {
-    // Simple mock analysis based on text patterns
     const sentences = narrative.split(/[.!?]+/).filter(s => s.trim())
 
+    // Dynamic extraction based on regex
     const videoFacts: string[] = []
     const interpretations: string[] = []
     const mindReads: string[] = []
 
-    for (const sentence of sentences.slice(0, 6)) {
-        const cleaned = sentence.trim()
-        if (!cleaned) continue
+    // Helper to find time
+    const timeMatch = narrative.match(/(\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm)?)/)
+    if (timeMatch) videoFacts.push(`Event occurred around ${timeMatch[0]}`)
+    else videoFacts.push("Event occurred (time unspecified)")
 
-        // Pattern matching for categorization
-        if (cleaned.match(/because.*(?:wanted|trying|meant)/i)) {
-            mindReads.push(cleaned)
-        } else if (cleaned.match(/(?:felt|seemed|appeared|think|believe|assume)/i)) {
-            interpretations.push(cleaned)
-        } else if (cleaned.match(/(?:said|did|went|came|called|texted|at \d)/i)) {
-            videoFacts.push(cleaned)
-        } else {
-            // Default to interpretation if unclear
-            interpretations.push(cleaned)
+    sentences.forEach(s => {
+        const lower = s.toLowerCase()
+        if (lower.includes('felt') || lower.includes('seemed')) {
+            interpretations.push(s)
+        } else if (lower.includes('thought you') || lower.includes('wanted to')) {
+            mindReads.push(s)
+        } else if (lower.includes('said') || lower.includes('went') || lower.includes('did')) {
+            videoFacts.push(s)
         }
-    }
+    })
 
-    // Ensure at least some content in each category
-    if (videoFacts.length === 0) {
-        videoFacts.push('Event occurred between the two parties')
-    }
-    if (interpretations.length === 0) {
-        interpretations.push('Narrator has feelings about the situation')
-    }
+    // Fallbacks if empty
+    if (videoFacts.length < 2) videoFacts.push("Two people interacted.")
+    if (interpretations.length === 0) interpretations.push("The situation felt tense.")
+    if (mindReads.length === 0) mindReads.push("Assumed the worst.")
 
     return {
         videoFacts: videoFacts.slice(0, 3),
         interpretations: interpretations.slice(0, 3),
         mindReads: mindReads.slice(0, 2),
-        emotionalUndertones: ['Processing', 'Seeking understanding'],
+        emotionalUndertones: ['Processing', 'Seeking connection', 'Uncertainty'],
     }
 }

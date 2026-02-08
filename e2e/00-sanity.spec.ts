@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 
 const users = {
     alex: process.env.VITE_TEST_USER_A ?? '',
@@ -14,7 +14,7 @@ const parseCredentials = (value: string) => {
     return { email, password }
 }
 
-const loginViaForm = async (page: any, credentials: { email: string; password: string }) => {
+const loginViaForm = async (page: Page, credentials: { email: string; password: string }) => {
     await page.goto('/login')
     const loginHeading = page.getByRole('heading', { name: 'The Reef' })
     await expect(loginHeading).toBeVisible()
@@ -25,7 +25,6 @@ const loginViaForm = async (page: any, credentials: { email: string; password: s
 
     const welcome = page.getByText('Welcome to Your Reef')
     const notLinked = page.getByRole('heading', { name: 'Welcome to The Reef!' })
-    const loginStillVisible = page.getByRole('heading', { name: 'The Reef' })
     const errorMessage = page.locator('.text-red-500, [role="alert"]')
 
     // Wait for the loading state to appear and then disappear to ensure auth processing is done
@@ -62,7 +61,7 @@ test.describe.serial('Sanity Checks', () => {
         fs.rmSync(markerPath, { force: true })
     })
 
-    test.afterEach(({ }, testInfo) => {
+    test.afterEach((_, testInfo) => {
         if (testInfo.status !== testInfo.expectedStatus) {
             sanityOk = false
         }

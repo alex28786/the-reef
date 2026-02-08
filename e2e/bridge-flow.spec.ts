@@ -1,5 +1,5 @@
 
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 
 const users = {
     alex: process.env.VITE_TEST_USER_A ?? '',
@@ -8,7 +8,7 @@ const users = {
 
 
 
-const login = async (page: any, autologin: string) => {
+const login = async (page: Page, autologin: string) => {
     const [email, password] = autologin.split('/')
     const encodedAutologin = `${encodeURIComponent(email)}/${encodeURIComponent(password)}`
     await page.goto(`/?autologin=${encodedAutologin}`)
@@ -40,7 +40,7 @@ const login = async (page: any, autologin: string) => {
     return true
 }
 
-const getBridgeMessageByContent = async (page: any, uniqueId: string) => {
+const getBridgeMessageByContent = async (page: Page, uniqueId: string) => {
     return page.evaluate(async (id: string) => {
         const key = Object.keys(localStorage).find(
             (entry) => entry.startsWith('sb-') && entry.endsWith('-auth-token')

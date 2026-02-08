@@ -205,11 +205,13 @@ Output ONLY valid JSON in this format:
 }
 
 // Helper: Mock Analysis (from aiService.ts)
+// Helper: Mock Analysis (from aiService.ts)
 function generateMockAnalysis(narrative: string) {
+    const isNegative = narrative.toLowerCase().includes('angry') || narrative.toLowerCase().includes('upset')
     return {
-        videoFacts: ['[MOCK] Event occurred at ' + new Date().toLocaleTimeString(), '[MOCK] Action observed'],
-        interpretations: ['[MOCK] User felt ignored', '[MOCK] Situation interpreted as negative'],
+        videoFacts: ['[MOCK] Event occurred at ' + new Date().toLocaleTimeString(), `[MOCK] Narrative length: ${narrative.length} chars`],
+        interpretations: [`[MOCK] User felt ${isNegative ? 'upset' : 'neutral'}`, '[MOCK] Situation interpreted as significant'],
         mindReads: ['[MOCK] Partner did not care', '[MOCK] Partner was busy'],
-        emotionalUndertones: ['[MOCK] Frustration', '[MOCK] Longing']
+        emotionalUndertones: [isNegative ? 'Frustration' : 'Calm', '[MOCK] Longing']
     }
 }

@@ -16,9 +16,7 @@ const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://sisrlbxaijnfrrvfj
 const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_Xww6V1I6XgOGP0RJAApAuw_srgLCr0W'
 
 // Test user IDs (from the remote database)
-const ALEX_ID = '0cf6d8d1-c217-4347-be8f-82eb10fbb8a3'
-const TIFF_ID = '47aba352-8c35-4a82-91ea-02f3ce392f7e'
-const REEF_ID = '03fd9135-2611-4182-84df-b98170e055cd'
+
 
 async function testRetroClerk() {
     console.log('🐙 Testing retro-clerk Edge Function...\n')

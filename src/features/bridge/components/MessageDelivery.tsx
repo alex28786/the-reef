@@ -5,6 +5,7 @@ import { EMOTIONS } from '../types'
 import { Button, Card } from '../../../shared/components'
 import { fetchRows, insertRow } from '../../../shared/lib/supabaseApi'
 import { useAuth } from '../../auth'
+import type { Profile } from '../../../shared/lib/profileRepository'
 
 interface MessageDeliveryProps {
     emotion: Emotion
@@ -37,7 +38,7 @@ export function MessageDelivery({
 
         try {
             // Get all profiles in the reef to find partner
-            const { data: profiles, error: profilesError } = await fetchRows<any>(
+            const { data: profiles, error: profilesError } = await fetchRows<Profile>(
                 'profiles',
                 accessToken,
                 `&reef_id=eq.${profile.reef_id}`
@@ -49,7 +50,7 @@ export function MessageDelivery({
             }
 
             console.log('Reef Members:', profiles)
-            let partnerData = profiles.find((p: any) => p.id !== profile.id)
+            const partnerData = profiles.find((p: Profile) => p.id !== profile.id)
 
             if (!partnerData) {
                 // For testing/dev, if ONLY 1 member exists, maybe allow proceed or warn?

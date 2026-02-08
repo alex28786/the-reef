@@ -1,5 +1,5 @@
 
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 
 const users = {
     alex: process.env.VITE_TEST_USER_A ?? '',
@@ -8,7 +8,7 @@ const users = {
 
 
 
-const login = async (page: any, autologin: string) => {
+const login = async (page: Page, autologin: string) => {
     const [email, password] = autologin.split('/')
     const encodedAutologin = `${encodeURIComponent(email)}/${encodeURIComponent(password)}`
     await page.goto(`/?autologin=${encodedAutologin}`)

@@ -124,17 +124,33 @@ function getMockResponse(text: string): AIResponse {
         }
     }
 
-    // Simple mock transformation
-    const transformedText = `I'm feeling upset right now. When ${text.toLowerCase().replace(/^you /, 'I notice that ').replace(/always|never/gi, 'sometimes')}, I feel hurt because I need to feel valued. Could we talk about this when we're both calm?`
+    // Dynamic suggestions based on analysis
+    const suggestions: string[] = []
+    if (horsemenFlags.includes('criticism')) {
+        suggestions.push('Try "I feel... caused by... I need..." instead of "You always..."')
+    }
+    if (horsemenFlags.includes('defensiveness')) {
+        suggestions.push('Try to take responsibility for just one small part of the problem.')
+    }
+    if (horsemenFlags.length === 0) {
+        suggestions.push('Great job focusing on your own feelings!')
+        suggestions.push('Clear and direct communication.')
+    }
+
+    // Better mock transformation
+    let transformedText = text
+    if (horsemenFlags.length > 0) {
+        transformedText = `I'm feeling overwhelmed. ` +
+            text.replace(/you always|you never/gi, 'I feel hurt when I see').replace(/why can't you/gi, 'I would love it if you could') +
+            ` I need to feel understood.`
+    }
 
     return {
         analysis: {
             horsemenFlags,
             detectedHorsemen,
             sentiment: horsemenFlags.length > 0 ? 'tense' : 'neutral',
-            suggestions: horsemenFlags.length > 0
-                ? ['Try using "I feel" statements', 'Focus on specific behaviors, not character']
-                : ['Good job expressing yourself!'],
+            suggestions: suggestions.slice(0, 3),
         },
         transformedText,
     }

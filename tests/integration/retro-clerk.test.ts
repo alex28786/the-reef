@@ -1,5 +1,5 @@
 
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { createClient } from '@supabase/supabase-js'
 import dotenv from 'dotenv'
 
@@ -67,7 +67,12 @@ describe.skipIf(!runAiTests)('Retro Clerk Integration', () => {
         expect(updatedRetro.status).toBe('revealed')
 
         const { data: submissions } = await supabase.from('retro_submissions').select('*').eq('retro_id', retro.id)
-        expect(submissions[0].ai_analysis).not.toEqual({})
-        expect(submissions[1].ai_analysis).not.toEqual({})
+
+        if (submissions) {
+            expect(submissions[0].ai_analysis).not.toEqual({})
+            expect(submissions[1].ai_analysis).not.toEqual({})
+        } else {
+            throw new Error('No submissions found')
+        }
     })
 })

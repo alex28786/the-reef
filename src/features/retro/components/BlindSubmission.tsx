@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Loader2, CheckCircle, Clock } from 'lucide-react'
 import { Button, Card, Textarea } from '../../../shared/components'
-import { fetchSingleRow, fetchRows, insertRow, updateRow } from '../../../shared/lib/supabaseApi'
+import { fetchRows, insertRow, updateRow } from '../../../shared/lib/supabaseApi'
 import { useAuth } from '../../auth'
 import { checkRetroStatus } from '../utils/aiService'
 import { callRpc } from '../../../shared/lib/supabaseApi'
@@ -19,15 +19,9 @@ export function BlindSubmission() {
     const [loading, setLoading] = useState(true)
     const [submitting, setSubmitting] = useState(false)
     const [error, setError] = useState('')
-    const [debugStatus, setDebugStatus] = useState<any>(null)
 
-    useEffect(() => {
-        if (retroId && profile?.id && accessToken) {
-            fetchData()
-        }
-    }, [retroId, profile?.id, accessToken])
 
-    async function fetchData() {
+    const fetchData = useCallback(async () => {
         if (!accessToken || !retroId || !profile?.id) return
         setLoading(true)
 
@@ -75,7 +69,13 @@ export function BlindSubmission() {
         }
 
         setLoading(false)
-    }
+    }, [accessToken, retroId, profile?.id])
+
+    useEffect(() => {
+        if (retroId && profile?.id && accessToken) {
+            fetchData()
+        }
+    }, [retroId, profile?.id, accessToken, fetchData])
 
     async function handleSubmit() {
         if (!retroId || !profile?.id || !narrative.trim() || !accessToken) return
@@ -128,7 +128,7 @@ export function BlindSubmission() {
                 }
             } catch (err) {
                 console.error('Status check failed:', err)
-                setDebugStatus({ error: (err as any).message || String(err) })
+
                 setLoading(false)
             }
         } catch (err) {
@@ -232,6 +232,15 @@ export function BlindSubmission() {
                     <p className="text-sm text-[var(--color-text-muted)] mb-4">
                         🐙 Share what happened from YOUR point of view. Be honest - your partner won't see this until you both submit.
                     </p>
+
+                    {retro.ai_summary && (retro.ai_summary as { initial_context?: string })?.initial_context && (
+                        <div className="bg-[var(--color-navy)] p-4 rounded-lg mb-4 text-sm">
+                            <h3 className="font-bold text-[var(--color-text)] mb-1">Initial Context:</h3>
+                            <p className="text-[var(--color-text-muted)]">
+                                {(retro.ai_summary as { initial_context?: string })?.initial_context}
+                            </p>
+                        </div>
+                    )}
 
                     <Textarea
                         placeholder="I remember that day... Here's what happened from my perspective..."

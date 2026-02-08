@@ -18,6 +18,8 @@ export interface Retro {
     status: RetroStatus
     submissions_count: number
     ai_summary: Record<string, unknown>
+    final_agreement: string | null
+    agreement_status: 'active' | 'fulfilled' | 'failed' | 'needs_revision'
     created_at: Date
 }
 

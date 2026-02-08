@@ -43,15 +43,17 @@ export interface AIAnalysis {
 
 export interface BridgeMessage {
     id: string
-    reefId: string
-    senderId: string
-    recipientId: string
+    reef_id: string
+    sender_id: string
+    recipient_id: string
     emotion: Emotion
-    originalText: string
-    transformedText?: string
-    aiAnalysis: AIAnalysis
-    acknowledgedAt?: Date
-    createdAt: Date
+    original_text: string
+    transformed_text?: string
+    ai_analysis: AIAnalysis
+    response_text?: string
+    response_ai_analysis?: AIAnalysis
+    acknowledged_at?: Date | string
+    created_at: Date | string
 }
 
 export interface BridgeFormData {

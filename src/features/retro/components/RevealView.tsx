@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Eye, Video, Brain, AlertTriangle, FileText, RefreshCw, Sparkles, Loader2, CheckCircle } from 'lucide-react'
+import { ArrowLeft, FileText, RefreshCw, Sparkles, Loader2, CheckCircle } from 'lucide-react'
 import { Button, Card, Textarea } from '../../../shared/components'
 import { fetchSingleRow, fetchRows, updateRow } from '../../../shared/lib/supabaseApi'
 import { useAuth } from '../../auth'
 import type { Retro, RetroSubmission, RetroAIAnalysis } from '../types'
-import { checkRetroStatus, generateMockAnalysis } from '../utils/aiService'
+import { checkRetroStatus } from '../utils/aiService'
 import { AnalysisColumn } from './AnalysisColumn'
 
 export function RevealView() {
@@ -22,13 +22,7 @@ export function RevealView() {
     const [scriptError, setScriptError] = useState('')
     const [scriptSuccess, setScriptSuccess] = useState(false)
 
-    useEffect(() => {
-        if (retroId && profile?.id && accessToken) {
-            fetchData()
-        }
-    }, [retroId, profile?.id, accessToken])
-
-    async function fetchData() {
+    const fetchData = useCallback(async () => {
         if (!accessToken || !retroId || !profile?.id) return
         setLoading(true)
 
@@ -56,13 +50,19 @@ export function RevealView() {
             setMySubmission(mine || null)
             setPartnerSubmission(partner || null)
 
-            if (mine?.future_script) {
-                setFutureScript(mine.future_script)
+            if (retroData && retroData.final_agreement) {
+                setFutureScript(retroData.final_agreement)
             }
         }
 
         setLoading(false)
-    }
+    }, [accessToken, retroId, profile?.id])
+
+    useEffect(() => {
+        if (retroId && profile?.id && accessToken) {
+            fetchData()
+        }
+    }, [retroId, profile?.id, accessToken, fetchData])
 
     async function handleCheckStatus() {
         if (!retroId || !accessToken) return
@@ -80,7 +80,7 @@ export function RevealView() {
     }
 
     async function handleSaveScript() {
-        if (!mySubmission || !futureScript.trim() || !accessToken) return
+        if (!retro || !futureScript.trim() || !accessToken) return
 
         setSavingScript(true)
         setScriptError('')
@@ -88,10 +88,10 @@ export function RevealView() {
 
         try {
             const { error } = await updateRow(
-                'retro_submissions',
+                'retros',
                 accessToken,
-                `id=eq.${mySubmission.id}`,
-                { future_script: futureScript.trim() }
+                `id=eq.${retro.id}`,
+                { final_agreement: futureScript.trim() }
             )
 
             if (error) throw error
@@ -99,7 +99,7 @@ export function RevealView() {
             setTimeout(() => setScriptSuccess(false), 3000)
         } catch (err) {
             console.error(err)
-            setScriptError('Failed to save script. Please try again.')
+            setScriptError('Failed to save agreement. Please try again.')
         } finally {
             setSavingScript(false)
         }
@@ -107,7 +107,7 @@ export function RevealView() {
 
     async function generateScriptSuggestion() {
         if (!futureScript.trim()) {
-            setFutureScript("In the future, when we notice we're interrupting each other, I need us to pause and take turns identifying one feeling each.")
+            setFutureScript("In the future, when we notice we're interrupting each other, we agree to pause and take turns identifying one feeling each.")
         }
     }
 
@@ -220,16 +220,16 @@ export function RevealView() {
                 <Card className="mt-8 border-[var(--color-seafoam)]/30">
                     <h2 className="text-lg font-bold text-[var(--color-text)] mb-2 flex items-center gap-2">
                         <FileText size={20} />
-                        The Script
+                        Shared Agreement
                     </h2>
                     <p className="text-sm text-[var(--color-text-muted)] mb-4">
-                        Complete this sentence to create a clear agreement for the future:
+                        What is your shared commitment for the future?
                     </p>
 
                     <div className="bg-[var(--color-navy)] rounded-xl p-4 mb-4">
                         <div className="flex justify-between items-start mb-2">
                             <p className="text-[var(--color-seafoam)] font-medium">
-                                "In the future, when [trigger] happens, I need [action]."
+                                "In the future, when [trigger] happens, we will [action]."
                             </p>
                             <button
                                 onClick={generateScriptSuggestion}
@@ -241,7 +241,7 @@ export function RevealView() {
                         </div>
 
                         <Textarea
-                            placeholder="In the future, when we disagree about plans, I need us to take a 10-minute break before discussing..."
+                            placeholder="In the future, when we disagree about plans, we will take a 10-minute break before discussing..."
                             value={futureScript}
                             onChange={(e) => setFutureScript(e.target.value)}
                             rows={3}
@@ -264,7 +264,7 @@ export function RevealView() {
                         variant="primary"
                         className="w-full"
                     >
-                        {savingScript ? <Loader2 size={16} className="animate-spin" /> : 'Save My Script'}
+                        {savingScript ? <Loader2 size={16} className="animate-spin" /> : 'Save Agreement'}
                     </Button>
                 </Card>
             </div>

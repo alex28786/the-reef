@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Routes, Route, useNavigate } from 'react-router-dom'
-import { Plus } from 'lucide-react'
-import { Button, Card } from '../../../shared/components'
+import { Plus, Search } from 'lucide-react'
+import { Button, Card, Input } from '../../../shared/components'
 import { fetchRows } from '../../../shared/lib/supabaseApi'
 import { useAuth } from '../../auth'
 import type { Retro } from '../types'
@@ -27,29 +27,40 @@ function RetroList() {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
 
+    const [filter, setFilter] = useState('')
+
     useEffect(() => {
+        async function fetchRetrosData() {
+            if (!profile?.reef_id || !accessToken) return
+
+            const { data, error: fetchError } = await fetchRows<Retro>(
+                'retros',
+                accessToken,
+                `&reef_id=eq.${profile.reef_id}&order=created_at.desc`
+            )
+
+            if (fetchError) {
+                console.error('Error fetching retros:', fetchError)
+                setError('Failed to load retrospectives.')
+            } else {
+                setRetros(data || [])
+            }
+            setLoading(false)
+        }
+
         if (profile?.reef_id && accessToken) {
             fetchRetrosData()
         }
     }, [profile?.reef_id, accessToken])
 
-    async function fetchRetrosData() {
-        if (!profile?.reef_id || !accessToken) return
-
-        const { data, error: fetchError } = await fetchRows<Retro>(
-            'retros',
-            accessToken,
-            `&reef_id=eq.${profile.reef_id}&order=created_at.desc`
+    const filteredRetros = retros.filter(retro => {
+        if (!filter) return true
+        const search = filter.toLowerCase()
+        return (
+            retro.title.toLowerCase().includes(search) ||
+            (retro.event_date && new Date(retro.event_date).toLocaleDateString().includes(search))
         )
-
-        if (fetchError) {
-            console.error('Error fetching retros:', fetchError)
-            setError('Failed to load retrospectives.')
-        } else {
-            setRetros(data || [])
-        }
-        setLoading(false)
-    }
+    })
 
     function getStatusBadge(status: string, count: number) {
         if (status === 'revealed') return 'bg-green-500/20 text-green-300'
@@ -90,6 +101,16 @@ function RetroList() {
                     Start New Retrospective
                 </Button>
 
+                <div className="mb-6 relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]" size={18} />
+                    <Input
+                        placeholder="Search retros..."
+                        value={filter}
+                        onChange={(e) => setFilter(e.target.value)}
+                        className="pl-10"
+                    />
+                </div>
+
                 {loading ? (
                     <div className="text-center py-8">
                         <div className="text-3xl animate-bounce">🐙</div>
@@ -103,15 +124,15 @@ function RetroList() {
                             </div>
                         )}
 
-                        {retros.length === 0 ? (
+                        {filteredRetros.length === 0 ? (
                             <Card className="text-center py-8">
                                 <p className="text-[var(--color-text-muted)]">
-                                    No retrospectives yet. Start one to work through a past event together.
+                                    {filter ? 'No retros match your search.' : 'No retrospectives yet. Start one to work through a past event together.'}
                                 </p>
                             </Card>
                         ) : (
                             <div className="space-y-3">
-                                {retros.map((retro) => (
+                                {filteredRetros.map((retro) => (
                                     <button
                                         key={retro.id}
                                         onClick={() => handleRetroClick(retro)}
@@ -140,6 +161,35 @@ function RetroList() {
                         )}
                     </>
                 )}
+            </div>
+
+            {/* Shared Agreements Section */}
+            <div className="max-w-lg mx-auto mt-12 border-t border-[var(--color-surface-hover)] pt-8">
+                <div className="text-center mb-6">
+                    <h2 className="text-xl font-bold text-[var(--color-text)]">Our Agreements</h2>
+                    <p className="text-[var(--color-text-muted)] text-sm">
+                        Shared commitments from past retrospectives
+                    </p>
+                </div>
+
+                <div className="space-y-4">
+                    {retros.filter(r => r.final_agreement).length === 0 ? (
+                        <p className="text-center text-[var(--color-text-muted)] text-sm italic">
+                            No agreements recorded yet. Complete a retrospective and save an outcome to see it here.
+                        </p>
+                    ) : (
+                        retros.filter(r => r.final_agreement).map(retro => (
+                            <Card key={retro.id} className="border-l-4 border-l-[var(--color-seafoam)]">
+                                <h3 className="font-bold text-[var(--color-text)] text-sm mb-2 opacity-80">
+                                    From: {retro.title}
+                                </h3>
+                                <p className="text-[var(--color-text)] leading-relaxed">
+                                    {retro.final_agreement}
+                                </p>
+                            </Card>
+                        ))
+                    )}
+                </div>
             </div>
         </div>
     )
