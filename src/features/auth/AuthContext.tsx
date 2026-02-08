@@ -2,14 +2,9 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { User, Session, AuthError } from '@supabase/supabase-js'
 import { supabase } from '../../shared/lib/supabase'
-
-interface Profile {
-    id: string
-    display_name: string
-    avatar_url: string | null
-    reef_id: string | null
-    role: 'husband' | 'wife' | null
-}
+import { fetchProfileById } from '../../shared/lib/profileRepository'
+import type { Profile } from '../../shared/lib/profileRepository'
+import { logger } from '../../shared/lib/logger'
 
 interface AuthContextType {
     user: User | null
@@ -30,16 +25,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [profile, setProfile] = useState<Profile | null>(null)
     const [session, setSession] = useState<Session | null>(null)
     const [loading, setLoading] = useState(true)
+    const enableAutologin = import.meta.env.VITE_ENABLE_AUTOLOGIN === 'true' || import.meta.env.DEV
 
     // Auto-login via URL parameter: ?autologin=email/password
     useEffect(() => {
+        if (!enableAutologin) return
         const params = new URLSearchParams(window.location.search)
         const autologin = params.get('autologin')
 
         if (autologin) {
             const [email, password] = autologin.split('/')
             if (email && password) {
-                console.log('[Auth] Auto-login detected for:', email)
+                logger.info('[Auth] Auto-login detected for:', email)
                 // Remove the autologin param from URL to prevent re-triggering
                 const newUrl = window.location.pathname +
                     (params.toString() ? '?' + (() => { params.delete('autologin'); return params.toString() })() : '')
@@ -49,9 +46,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 supabase.auth.signInWithPassword({ email, password })
                     .then(({ error }) => {
                         if (error) {
-                            console.error('[Auth] Auto-login failed:', error.message)
+                            logger.error('[Auth] Auto-login failed:', error.message)
                         } else {
-                            console.log('[Auth] Auto-login successful!')
+                            logger.info('[Auth] Auto-login successful!')
                         }
                     })
             }
@@ -60,37 +57,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         // Get initial session with error handling
-        console.log('[Auth] Starting initial session check...')
+        logger.info('[Auth] Starting initial session check...')
         supabase.auth.getSession()
             .then(({ data: { session } }) => {
-                console.log('[Auth] Got session:', session ? 'YES' : 'NO', session?.user?.id)
+                logger.debug('[Auth] Got session:', session ? 'YES' : 'NO', session?.user?.id)
                 setSession(session)
                 setUser(session?.user ?? null)
                 if (session?.user && session.access_token) {
-                    console.log('[Auth] User found, fetching profile...')
+                    logger.debug('[Auth] User found, fetching profile...')
                     fetchProfile(session.user.id, session.access_token)
                 } else {
-                    console.log('[Auth] No user, setting loading to false')
+                    logger.debug('[Auth] No user, setting loading to false')
                     setLoading(false)
                 }
             })
             .catch((error) => {
-                console.error('[Auth] Error getting session:', error)
+                logger.error('[Auth] Error getting session:', error)
                 setLoading(false)
             })
 
         // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, session) => {
-                console.log('[Auth] Auth state changed:', event, session?.user?.id)
+                logger.debug('[Auth] Auth state changed:', event, session?.user?.id)
+                setLoading(true)
                 setSession(session)
                 setUser(session?.user ?? null)
 
                 if (session?.user && session.access_token) {
-                    console.log('[Auth] Session user found after state change, fetching profile...')
+                    logger.debug('[Auth] Session user found after state change, fetching profile...')
                     await fetchProfile(session.user.id, session.access_token)
                 } else {
-                    console.log('[Auth] No session user after state change')
+                    logger.debug('[Auth] No session user after state change')
                     setProfile(null)
                 }
                 setLoading(false)
@@ -101,49 +99,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, [])
 
     async function fetchProfile(userId: string, accessToken: string, retries = 3): Promise<void> {
-        console.log('[Auth] fetchProfile called with userId:', userId)
-
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-        const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-
         for (let attempt = 1; attempt <= retries; attempt++) {
-            console.log(`[Auth] Attempting profile fetch (attempt ${attempt}/${retries})...`)
+            logger.debug(`[Auth] Attempting profile fetch (attempt ${attempt}/${retries})...`)
             try {
-                // Use raw fetch to bypass Supabase client's AbortController
-                const response = await fetch(
-                    `${supabaseUrl}/rest/v1/profiles?id=eq.${userId}&select=*`,
-                    {
-                        method: 'GET',
-                        headers: {
-                            'apikey': supabaseAnonKey,
-                            'Authorization': `Bearer ${accessToken}`,
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/vnd.pgrst.object+json',
-                        },
-                    }
-                )
-
-                console.log('[Auth] Profile fetch response status:', response.status)
-
-                if (!response.ok) {
-                    if (response.status === 406) {
-                        // No profile found
-                        console.log('[Auth] No profile found (406)')
+                const { data, error } = await fetchProfileById(accessToken, userId)
+                if (error) {
+                    if (error.message.includes('406')) {
+                        logger.debug('[Auth] No profile found (406)')
                         setProfile(null)
                         setLoading(false)
                         return
                     }
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+                    throw error
                 }
-
-                const data = await response.json()
-                console.log('[Auth] Profile data received:', data)
-
                 setProfile(data)
                 setLoading(false)
                 return
             } catch (err) {
-                console.error(`[Auth] Exception fetching profile (attempt ${attempt}):`, err)
+                logger.error(`[Auth] Exception fetching profile (attempt ${attempt}):`, err)
                 if (attempt < retries) {
                     await new Promise(resolve => setTimeout(resolve, 500 * attempt))
                     continue
@@ -151,7 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
         }
         // All retries failed
-        console.error('[Auth] All profile fetch attempts failed')
+        logger.error('[Auth] All profile fetch attempts failed')
         setProfile(null)
         setLoading(false)
     }

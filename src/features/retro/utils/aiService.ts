@@ -1,6 +1,6 @@
 import type { RetroAIAnalysis } from '../types'
-import { RETRO_PROMPTS } from '../types'
-import { supabase } from '../../../shared/lib/supabase'
+import { buildEdgeHeaders, getAiMockFlag } from '../../../shared/lib/aiConfig'
+import { logger } from '../../../shared/lib/logger'
 
 const DEFAULT_CLERK_PROMPT = `You are Octi, a wise and compassionate AI assistant helping a couple understand their different perspectives of the same event.
 
@@ -24,13 +24,10 @@ export async function checkRetroStatus(retroId: string, accessToken?: string): P
     try {
         const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/retro-clerk`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${accessToken || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-            },
+            headers: buildEdgeHeaders(accessToken),
             body: JSON.stringify({
                 retro_id: retroId,
-                mock: true // Enabled for testing/dev 
+                mock: getAiMockFlag()
             }),
         })
 
@@ -39,7 +36,7 @@ export async function checkRetroStatus(retroId: string, accessToken?: string): P
         }
         return { status: 'error', message: 'Function error' }
     } catch (e) {
-        console.warn('Edge function unavailable', e)
+        logger.warn('Edge function unavailable', e)
         return { status: 'error', message: 'Network error' }
     }
 }

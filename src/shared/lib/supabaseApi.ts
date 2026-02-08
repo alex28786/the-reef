@@ -1,5 +1,6 @@
 // Raw fetch-based Supabase API helpers to bypass AbortController issues
 // Use this instead of the supabase client for data operations
+import { logger } from './logger'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -64,7 +65,7 @@ export async function supabaseFetch<T>(
         const data = await response.json()
         return { data, error: null }
     } catch (err) {
-        console.error('[supabaseFetch] Error:', err)
+        logger.error('[supabaseFetch] Error:', err)
         return { data: null, error: err as Error }
     }
 }
@@ -160,7 +161,7 @@ export async function callRpc<T>(
         const data = await response.json()
         return { data, error: null }
     } catch (err) {
-        console.error(`[callRpc] Error calling ${functionName}:`, err)
+        logger.error(`[callRpc] Error calling ${functionName}:`, err)
         return { data: null, error: err as Error }
     }
 }

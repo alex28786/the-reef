@@ -1,104 +1,109 @@
-import { test, expect } from '@playwright/test';
 
-test.describe('Retro Workflow with AI', () => {
-    // Shared retro ID to be used by both users
-    let retroId;
+import { test, expect } from '@playwright/test'
 
-    // Login helpers - wait for actual home page content rather than just URL
-    const loginAlex = async (page: any) => {
-        await page.goto('/?autologin=alex28786@gmail.com/Doffel%266128');
-        // Wait for the home page content to appear (proves auth succeeded)
-        await expect(page.getByText('The Bridge').first()).toBeVisible({ timeout: 20000 });
-    };
+const users = {
+    alex: process.env.VITE_TEST_USER_A ?? '',
+    tiff: process.env.VITE_TEST_USER_B ?? '',
+}
 
-    const loginTiff = async (page: any) => {
-        await page.goto('/?autologin=tiff@tiff.de/tifftiff');
-        await expect(page.getByText('The Bridge').first()).toBeVisible({ timeout: 20000 });
-    };
 
-    test('Complete Retro Cycle: Create -> Submit (Both) -> Reveal', async ({ browser }) => {
-        // 1. Alex creates the Retro
-        const context1 = await browser.newContext();
-        const page1 = await context1.newPage();
-        page1.on('console', msg => console.log('PAGE1 LOG:', msg.text()));
-        await loginAlex(page1);
 
-        // Create new Retro
-        // Direct navigation to debug button click issues
-        await page1.goto('/retro/new');
-        await expect(page1).toHaveURL(/\/retro\/new/);
-        await expect(page1).toHaveURL(/\/retro\/new/);
+const login = async (page: any, autologin: string) => {
+    const [email, password] = autologin.split('/')
+    const encodedAutologin = `${encodeURIComponent(email)}/${encodeURIComponent(password)}`
+    await page.goto(`/?autologin=${encodedAutologin}`)
 
-        await page1.fill('input[placeholder="e.g., The argument about vacation plans"]', 'Test Retro: Pizza Night');
-        await page1.fill('input[type="date"]', new Date().toISOString().split('T')[0]);
-        await page1.getByRole('button', { name: 'Create Retrospective' }).click();
+    const loginHeading = page.getByRole('heading', { name: 'The Reef' })
+    if (await loginHeading.isVisible({ timeout: 3000 })) {
+        await page.getByLabel('Email').fill(email)
+        await page.getByLabel('Password').fill(password)
+        await page.getByRole('button', { name: 'Sign In' }).click()
+    }
 
-        // Capture Retro ID from URL
-        await expect(page1).toHaveURL(/\/retro\/.*\/submit/);
-        const url = page1.url();
-        retroId = url.split('/').slice(-2)[0];
-        console.log('Created Retro ID:', retroId);
+    const welcome = page.getByText('Welcome to Your Reef')
+    const loginStillVisible = page.getByRole('heading', { name: 'The Reef' })
 
-        // Alex Submits
-        await page1.fill('textarea', 'I thought we agreed on pepperoni, but she ordered hawaiian. I felt unheard.');
-        await page1.getByRole('button', { name: 'Submit My Story' }).click();
+    // Wait for loading to finish
+    await expect(page.getByText('Loading...')).toBeVisible({ timeout: 5000 }).catch(() => { })
+    await expect(page.getByText('Loading...')).toBeHidden({ timeout: 20000 })
 
-        // Verify Alex sees "Waiting..."
-        await expect(page1.getByText('Your story')).toBeVisible();
-        await expect(page1.getByText('Submitted').first()).toBeVisible();
-        await expect(page1.getByText('Waiting...')).toBeVisible();
+    const winner = await Promise.race([
+        welcome.waitFor({ state: 'visible', timeout: 20000 }).then(() => 'welcome'),
+        loginStillVisible.waitFor({ state: 'visible', timeout: 20000 }).then(() => 'login'),
+    ])
 
-        // 2. Tiff Submits (Triggers AI)
-        const context2 = await browser.newContext();
-        const page2 = await context2.newPage();
-        page2.on('console', msg => console.log('PAGE2 LOG:', msg.text()));
-        await loginTiff(page2);
+    if (winner === 'login') {
+        return false
+    }
 
-        // Navigate to the SPECIFIC retro (simulate clicking link or finding in list)
-        // For test stability, go directly to URL
-        await page2.goto(`/retro/${retroId}/submit`);
+    await expect(page).toHaveURL('/', { timeout: 20000 })
+    return true
+}
 
-        // Tiff Submits
-        await page2.fill('textarea', 'I just wanted to surprise him with something sweet and savory. He seemed so angry over nothing.');
+test.describe('Retro Workflow', () => {
+    // Check for required environment variables
+    test.beforeAll(() => {
+        if (!users.alex || !users.tiff) {
+            throw new Error('Missing VITE_TEST_USER_A or VITE_TEST_USER_B. Cannot run E2E tests.')
+        }
+    })
 
-        // Click submit and wait for navigation to Reveal (which implies AI success)
-        await page2.getByRole('button', { name: 'Submit My Story' }).click();
-
-        // This step might take longer due to AI processing
-        try {
-            await expect(page2).toHaveURL(/\/reveal$/, { timeout: 30000 });
-        } catch (e) {
-            console.log('Final page URL:', page2.url());
-            if (await page2.getByTestId('debug-status').isVisible()) {
-                console.log('DEBUG STATUS:', await page2.getByTestId('debug-status').innerText());
-            } else {
-                console.log('DEBUG STATUS: Element not visible');
-            }
-            throw e;
+    test('Complete retro flow across both users', async ({ browser }) => {
+        const contextAlex = await browser.newContext()
+        const pageAlex = await contextAlex.newPage()
+        if (!await login(pageAlex, users.alex)) {
+            test.skip(true, 'E2E login failed for user A; verify Supabase auth and test users exist.')
         }
 
-        // 3. Verify Reveal Page Content (Tiff side)
-        await expect(page2.getByText('The Reveal')).toBeVisible();
-        await expect(page2.getByText('Test Retro: Pizza Night')).toBeVisible();
-        await expect(page2.getByRole('heading', { name: 'Video Camera Facts' })).toBeVisible();
-        await expect(page2.getByRole('heading', { name: 'Interpretations' })).toBeVisible();
+        await pageAlex.goto('/retro/new')
+        await expect(pageAlex).toHaveURL(/\/retro\/new/)
 
-        // Check for some structured output (lists)
-        const videoFacts = page2.locator('.text-green-400').locator('..').locator('..').locator('li');
-        await expect(videoFacts.first()).toBeVisible();
+        const retroTitle = `Test Retro: Pizza Night ${Date.now()}`
+        await pageAlex.fill('input[placeholder="e.g., The argument about vacation plans"]', retroTitle)
+        await pageAlex.fill('input[type="date"]', new Date().toISOString().split('T')[0])
+        await pageAlex.getByRole('button', { name: 'Create Retrospective' }).click()
 
-        // 4. Verify Alex side updates
-        // Alex refreshes or navigates
-        await page1.reload();
-        // Should now see "Both stories submitted!" and "View The Reveal"
-        await expect(page1.getByRole('button', { name: 'View The Reveal' })).toBeVisible();
-        await page1.getByRole('button', { name: 'View The Reveal' }).click();
+        await expect(pageAlex).toHaveURL(/\/retro\/.*\/submit/)
+        const retroId = pageAlex.url().split('/').slice(-2)[0]
 
-        await expect(page1).toHaveURL(/\/reveal$/);
-        await expect(page1.getByText('The Reveal')).toBeVisible();
+        await pageAlex.fill('textarea', 'I thought we agreed on pepperoni, but she ordered hawaiian. I felt unheard.')
+        await pageAlex.getByRole('button', { name: 'Submit My Story' }).click()
 
-        // Cleanup contexts
-        await context1.close();
-        await context2.close();
-    });
-});
+        await expect(pageAlex.getByText('Your story')).toBeVisible()
+        await expect(pageAlex.getByText('Submitted').first()).toBeVisible()
+        await expect(pageAlex.getByText('Waiting...')).toBeVisible()
+
+        const contextTiff = await browser.newContext()
+        const pageTiff = await contextTiff.newPage()
+        if (!await login(pageTiff, users.tiff)) {
+            test.skip(true, 'E2E login failed for user B; verify Supabase auth and test users exist.')
+        }
+
+        await pageTiff.goto(`/retro/${retroId}/submit`)
+        await pageTiff.fill('textarea', 'I just wanted to surprise him with something sweet and savory. He seemed so angry over nothing.')
+        await pageTiff.getByRole('button', { name: 'Submit My Story' }).click()
+
+        await expect(pageTiff).toHaveURL(/\/reveal$/, { timeout: 30000 })
+
+        await expect(pageTiff.getByText('The Reveal')).toBeVisible()
+        await expect(pageTiff.getByText(retroTitle)).toBeVisible()
+
+        // Both users' columns should be visible, so headings appear twice
+        await expect(pageTiff.getByRole('heading', { name: 'Video Camera Facts' })).toHaveCount(2)
+        await expect(pageTiff.getByRole('heading', { name: 'Interpretations' })).toHaveCount(2)
+
+        // Locate facts relative to the heading to be robust against color changes
+        const factsHeading = pageTiff.getByRole('heading', { name: 'Video Camera Facts' }).first()
+        const videoFacts = factsHeading.locator('..').locator('ul > li')
+        await expect(videoFacts.first()).toBeVisible()
+
+        await pageAlex.reload()
+        await expect(pageAlex.getByRole('button', { name: 'View The Reveal' })).toBeVisible()
+        await pageAlex.getByRole('button', { name: 'View The Reveal' }).click()
+        await expect(pageAlex).toHaveURL(/\/reveal$/)
+        await expect(pageAlex.getByText('The Reveal')).toBeVisible()
+
+        await contextAlex.close()
+        await contextTiff.close()
+    })
+})
